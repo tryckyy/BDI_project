@@ -29,6 +29,7 @@ class SimulationPanel extends JPanel {
         Road horizontalRoad2 = new Road(100, 320, 600, Color.DARK_GRAY, true, 2, true);
         Road verticalRoad = new Road(390, 100, 400, Color.GRAY, false, 2, true);
         Road verticalRoad2 = new Road(410, 100, 400, Color.DARK_GRAY, false, 2, false);
+        System.out.println("Vertical road " + verticalRoad);
 
         // Création des routes avec virages
         List<RoadSegment> rightTurnSegments = new ArrayList<>();
@@ -51,6 +52,8 @@ class SimulationPanel extends JPanel {
 
         verticalRoad.setPairedRoad(verticalRoad2);
         verticalRoad2.setPairedRoad(verticalRoad);
+        horizontalRoad.setPairedRoad(horizontalRoad2);
+        horizontalRoad2.setPairedRoad(horizontalRoad);
 
         // Ajouter toutes les routes à la liste
         roads.addAll(List.of(
@@ -95,7 +98,7 @@ class SimulationPanel extends JPanel {
         // Création des véhicules
         roads.forEach(road -> {
             for(int i = 0; i < 1; i++) {
-                Vehicle v = new Vehicle(road, i * 80, 2 + i%3, this);
+                Vehicle v = new Vehicle(road, i * 80, 2, this);
                 vehicles.add(v);
             }
         });
@@ -105,6 +108,14 @@ class SimulationPanel extends JPanel {
     public void updateSimulation() {
         manageTrafficLights();
         vehicles.forEach(Vehicle::update);
+    }
+
+    public List<Vehicle> getVehiclesOnRoad(Road road) {
+        return Collections.unmodifiableList(
+                vehicles.stream()
+                        .filter(v -> v.currentRoad.equals(road)) // Utilisez equals() si les routes ont une identité logique
+                        .collect(Collectors.toList())
+        );
     }
 
     private void manageTrafficLights() {
@@ -164,6 +175,7 @@ class SimulationPanel extends JPanel {
     private void setAllLights(TrafficLight.State state) {
         trafficLights.forEach(light -> light.setState(state));
     }
+
 
     @Override
     protected void paintComponent(Graphics g) {

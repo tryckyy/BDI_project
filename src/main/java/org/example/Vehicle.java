@@ -3,23 +3,26 @@ package org.example;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
-import static java.lang.Integer.MAX_VALUE;
 
 class Vehicle {
     // Constantes de comportement
-    private static final double SAFE_FOLLOW_DISTANCE = 40.0;
-    private static final double EMERGENCY_BRAKE_DISTANCE = 20.0;
+    private static final double SAFE_FOLLOW_DISTANCE = 60.0;
+    private static final double EMERGENCY_BRAKE_DISTANCE = 10.0;
     private static final int MAX_SPEED = 5;
-    private static final int STOP_DISTANCE = 30;
+    private static final double STOP_DISTANCE = 30.0;
     private static final int LANE_WIDTH = 20;
     private static final int LOOK_AHEAD = 80;
-    public static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 30;
+    public static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 70;
     private static final int LANE_CHANGE_COOLDOWN = 100;
     private int laneChangeTimer = 0;
+    private boolean isOvertaking = false;
+    private int maxSpeed = 8;
 
     public Road currentRoad;
     private int position;
+    private int baseSpeed = 2;
     private int speed;
     private boolean isInRightLane;
     public int laneOffset;
@@ -48,6 +51,7 @@ class Vehicle {
         evaluateDesires();
         executeIntention();
         move();
+        if (laneChangeTimer > 0) laneChangeTimer--;
     }
 
     private void perceiveEnvironment() {
@@ -57,6 +61,8 @@ class Vehicle {
         beliefs.put("frontVehicle", environment.getVehiclesInLane(this).stream()
                 .filter(this::isAheadOf)
                 .min(Comparator.comparingDouble(this::distanceTo)));
+
+
     }
 
     private int currentMaxSpeed() {
@@ -66,75 +72,154 @@ class Vehicle {
     private void evaluateDesires() {
         desires.clear();
 
-        Optional<Road> nextRoad = detectUpcomingSpeedLimitChange();
-        nextRoad.ifPresent(road -> {
-            if(road.getSpeedLimit() < currentRoad.getSpeedLimit()) {
-                desires.add("decelerate");
-            }
-        });
-
 
 
         // Évaluation des feux rouges
-        Optional<TrafficLight> lightOpt = (Optional<TrafficLight>) beliefs.get("nextTrafficLight");
-        lightOpt.ifPresent(light -> {
-            TrafficLight.State lightState = light.getState();
-            if (lightState == TrafficLight.State.RED || lightState == TrafficLight.State.ORANGE) {
-                double distance = getDistanceToLight(light);
-                boolean isApproaching = isApproachingLight(light);
-                boolean isAtLight = distance <= 40.0;
 
-                if (isApproaching || isAtLight) {
-                    if(lightState == TrafficLight.State.RED) {
-                        if (distance < STOP_DISTANCE) {
-                            desires.add("fullStop");
-                        } else if (distance < STOP_DISTANCE * 2) {
-                            desires.add("decelerate");
-                        }
-                    }
-                    else if (lightState == TrafficLight.State.ORANGE) {
-                        desires.add("decelerate");
-                        if (distance < STOP_DISTANCE) {
-                            desires.add("emergencyBrake");
-                        }
-                    }
-
-                }
-            }
-        });
 
         // Évaluation des véhicules précédents
         Optional<Vehicle> frontVehicle = (Optional<Vehicle>) beliefs.get("frontVehicle");
         frontVehicle.ifPresent(v -> {
+
             double distance = distanceTo(v);
-            if (distance < EMERGENCY_BRAKE_DISTANCE) {
-                desires.add("emergencyBrake");
-            } else if (distance < SAFE_FOLLOW_DISTANCE) {
+            if(distance < 60.0) {
+                desires.add("fullStop");
+            }
+            else if(distance < 120.0) {
                 desires.add("decelerate");
             }
         });
 
+        Optional<TrafficLight> lightOpt = (Optional<TrafficLight>) beliefs.get("nextTrafficLight");
+        if (canOvertake() && isInRightLane && !lightOpt.isPresent() && beliefs.containsKey("frontVehicle")) {
+            desires.add("maintainSpeed");
+            desires.add("overtake");
+        }
+
+        else if(isAdjacentLaneClear() && !isInRightLane && !lightOpt.isPresent() ) {
+            desires.add("changeLane");
+        }
+
+        lightOpt.ifPresent(light -> {
+            TrafficLight.State lightState = light.getState();
+            double distance = getDistanceToLight(light);
+            boolean isApproaching = isApproachingLight(light);
+            boolean isAtLight = distance <= 40.0;
+
+
+            if (lightState == TrafficLight.State.RED || lightState == TrafficLight.State.ORANGE) {
+                desires.remove("overtake");
+
+                if (isApproaching || isAtLight) {
+                    if (lightState == TrafficLight.State.RED) {
+                        if (distance < STOP_DISTANCE) {
+                            desires.add("fullStop");
+                        } else if (distance < SAFE_FOLLOW_DISTANCE) {
+                            desires.add("decelerate");
+                        }
+                    } else if (lightState == TrafficLight.State.ORANGE) {
+                        desires.add("decelerate");
+                        if (distance < STOP_DISTANCE) {
+                            desires.add("fullStop");
+                        }
+
+                    }
+
+                }
+
+            }
+
+            else if(lightState == TrafficLight.State.GREEN) {
+                desires.add("maintainSpeed");
+            }
+        });
+
+        System.out.println(desires);
+
+
         if(desires.isEmpty()) desires.add("maintainSpeed");
     }
 
-    private void executeIntention() {
-        // Priorité: arrêt d'urgence > feu rouge > décélération > maintien vitesse
-        speed = Math.min(speed + 1, currentMaxSpeed());
+    private boolean canOvertake() {
+        if(isAdjacentLaneClear()){
+            return true;
+        }
+        if (isOvertaking || currentRoad.isRightLane() || laneChangeTimer > 0)
+            return false;
 
-        if(desires.contains("emergencyBrake")) {
-            speed = Math.max(0, speed - 3);
-        }
-        else if(desires.contains("fullStop")) {
-            speed = 0;
-        }
-        else if(desires.contains("decelerate")) {
-            speed = Math.max(speed - 1, 0);
-        }
+        Optional<Vehicle> frontVehicleOpt = (Optional<Vehicle>) beliefs.get("frontVehicle");
+        if (!frontVehicleOpt.isPresent() || speed <= frontVehicleOpt.get().speed)
+            return false;
 
-        else {
-            speed = Math.min(speed + 1, MAX_SPEED);
+        // Vérifier la distance de sécurité
+        double distance = distanceTo(frontVehicleOpt.get());
+        if (distance > SAFE_FOLLOW_DISTANCE)
+            return false;
+
+        return true;
+    }
+
+    private boolean isAdjacentLaneClear() {
+        Road paired = currentRoad.getPairedRoad();
+        if(paired == null) return false;
+        List<Vehicle> adjacentVehicles = environment.getVehiclesOnRoad(paired);
+        return adjacentVehicles.stream().noneMatch(v ->
+                Math.abs(v.position - this.position) < MIN_SAFE_LANE_CHANGE_DISTANCE
+        );
+    }
+
+    void overtake() {
+        if (!isInRightLane) {
+            speed = Math.min(speed + 2, maxSpeed); // Accelerate during overtake
+            isOvertaking = true;
+            isInRightLane = !isInRightLane; // Switch lanes
+            laneOffset += currentRoad.isHorizontal() ? LANE_WIDTH/8 : -LANE_WIDTH/8;
+            currentRoad = currentRoad.getPairedRoad();
+
+        }
+        isOvertaking = false;
+        desires.remove("overtake");
+    }
+
+    void changeLane() {
+        if(isAdjacentLaneClear()) {
+            currentRoad = currentRoad.getPairedRoad();
+            System.out.println("Road : " + currentRoad + "vehicles" + environment.getVehiclesOnRoad(currentRoad));
+            isInRightLane = !isInRightLane;
+            laneOffset += currentRoad.isHorizontal() ? LANE_WIDTH/8 : -LANE_WIDTH/8;
         }
     }
+
+
+
+    private double getPositionDistance(Vehicle other) {
+        return other.position - this.position;
+    }
+
+    private void executeIntention() {
+        if (desires.contains("maintainSpeed")) {
+            speed = baseSpeed;
+        }
+
+        else if(desires.contains("decelerate")) {
+            speed = Math.max(speed - 1, 1);
+        }
+
+
+        else if(desires.contains("accelerate")) {
+            speed = Math.max(speed + 1, 6);
+        }
+        else if(desires.contains("overtake")) {
+            overtake();
+        }
+        else if(desires.contains("changeLane")) {
+            changeLane();
+        }
+        if(desires.contains("fullStop")) {
+            speed = 0;
+        }
+    }
+
 
     private void move() {
         position += speed;
