@@ -10,6 +10,7 @@ public class Road {
     private Road nextRoad;
     private boolean isRightLane;
     private Road pairedRoad;
+    private boolean reverse;
 
     public Road getPairedRoad() { return pairedRoad; }
     public void setPairedRoad(Road pairedRoad) { this.pairedRoad = pairedRoad; }
@@ -20,15 +21,21 @@ public class Road {
 
 
 
-    public Road(List<RoadSegment> segments, Color color) {
+    public Road(List<RoadSegment> segments, Color color, boolean reverse) {
         this.segments = segments;
         this.color = color;
+        this.reverse = reverse;
         connectSegments();
     }
 
+    public boolean isReverse() {
+        return reverse;
+    }
+
+
     public Road(int startX, int startY, int length, Color color, boolean horizontal, boolean isRightLane) {
         this.segments = new ArrayList<>();
-        segments.add(new RoadSegment(startX, startY, length, horizontal));
+        segments.add(new RoadSegment(startX, startY, length, horizontal, reverse));
         this.color = color;
         this.isRightLane = isRightLane;
         connectSegments();

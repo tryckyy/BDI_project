@@ -36,7 +36,7 @@ class Vehicle {
                 (int)(Math.random() * 200 + 55),
                 (int)(Math.random() * 200 + 55)
         );
-        this.isInRightLane = road.isRightLane();
+        this.isInRightLane = currentRoad.isRightLane();
     }
 
     public void update() {
@@ -75,13 +75,13 @@ class Vehicle {
         });
 
         Optional<TrafficLight> lightOpt = (Optional<TrafficLight>) beliefs.get("nextTrafficLight");
-
         if(isAdjacentLaneClear() && !isInRightLane && !lightOpt.isPresent() ) {
             desires.add("changeLane");
         }
         else if(!isAdjacentLaneClear() && !isInRightLane && !lightOpt.isPresent()) {
             desires.add("accelerate");
         }
+
 
         lightOpt.ifPresent(light -> {
             TrafficLight.State lightState = light.getState();
@@ -117,7 +117,6 @@ class Vehicle {
             }
         });
 
-        System.out.println(desires);
 
 
         if(desires.isEmpty()) desires.add("maintainSpeed");
@@ -138,7 +137,6 @@ class Vehicle {
     void changeLane() {
         if(isAdjacentLaneClear()) {
             currentRoad = currentRoad.getPairedRoad();
-            System.out.println("Road : " + currentRoad + "vehicles" + environment.getVehiclesOnRoad(currentRoad));
             isInRightLane = !isInRightLane;
             laneOffset += currentRoad.isHorizontal() ? LANE_WIDTH/8 : -LANE_WIDTH/8;
         }
@@ -168,17 +166,37 @@ class Vehicle {
 
 
     private void move() {
-        position += speed;
-        if (position > currentRoad.getLength()) {
-            if (currentRoad.getNextRoad() != null) {
-                // Passer à la prochaine route et réinitialiser la position
-                currentRoad = currentRoad.getNextRoad();
-                position = 0;
-            } else {
-                // Si aucune route suivante, boucler sur la même route
-                position %= currentRoad.getLength();
+
+        if(currentRoad.isReverse() && position >= -currentRoad.getLength()) {
+            position -= speed;
+        }
+            else if(position < -currentRoad.getLength()) {
+                if(currentRoad.getNextRoad() != null) {
+                    currentRoad = currentRoad.getNextRoad();
+                    isInRightLane = currentRoad.isRightLane();
+                    position = 0;
+                }
+            }
+
+        else {
+            position += speed;
+            if (position > currentRoad.getLength()) {
+                if (currentRoad.getNextRoad() != null) {
+                    // Passer à la prochaine route et réinitialiser la position
+                    currentRoad = currentRoad.getNextRoad();
+                    isInRightLane = currentRoad.isRightLane();
+                    position = 0;
+                } else {
+                    // Si aucune route suivante, boucler sur la même route
+                    position %= currentRoad.getLength();
+                }
             }
         }
+
+
+
+
+
     }
 
 
@@ -243,10 +261,17 @@ class Vehicle {
         RoadSegment currentSegment = currentRoad.getCurrentSegment(pos);
         boolean isHorizontal = currentSegment.isHorizontal();
 
-        if(isHorizontal) {
-            g.fillRect(pos.x - 10, pos.y - 5, 20, 10);
+        if(currentSegment.isReverse() && !isHorizontal) {
+            g.fillRect(pos.x - 5, pos.y + currentSegment.getLength() , 10, 20);
+        } else if (currentSegment.isReverse() && isHorizontal) {
+            g.fillRect(pos.x + currentSegment.getLength(), pos.y - 5 , 20, 10);
         } else {
-            g.fillRect(pos.x - 5, pos.y - 10, 10, 20);
+
+            if (isHorizontal) {
+                g.fillRect(pos.x - 10, pos.y - 5, 20, 10);
+            } else {
+                g.fillRect(pos.x - 5, pos.y - 10, 10, 20);
+            }
         }
     }
 }

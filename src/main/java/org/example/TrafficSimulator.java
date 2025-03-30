@@ -7,7 +7,7 @@ public class TrafficSimulator extends JFrame {
 
     public TrafficSimulator() {
         setTitle("Traffic Simulator BDI");
-        setSize(800, 600);
+        setSize(1920, 1080);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 
         simulationPanel = new SimulationPanel();

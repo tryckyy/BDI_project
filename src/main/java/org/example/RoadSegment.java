@@ -5,15 +5,21 @@ import java.awt.*;
 public class RoadSegment {
     int startX;
     int startY;
-    private int length;
-    private RoadSegment nextSegment;
-    private boolean horizontal;
 
-    public RoadSegment(int startX, int startY, int length, boolean horizontal) {
+    public boolean isReverse() {
+        return reverse;
+    }
+
+    private int length;
+    private boolean horizontal;
+    private boolean reverse;
+
+    public RoadSegment(int startX, int startY, int length, boolean horizontal, boolean reverse) {
         this.startX = startX;
         this.startY = startY;
         this.length = length;
         this.horizontal = horizontal;
+        this.reverse = reverse;
     }
 
     public Point getPosition(int progression, int laneOffset) {
@@ -45,14 +51,22 @@ public class RoadSegment {
         }
     }
 
+
     public void setNextSegment(RoadSegment next) {
-        this.nextSegment = next;
-        if(horizontal) {
-            next.startX = startX + length;
-            next.startY = startY;
-        } else {
+        if(reverse) {
             next.startX = startX;
+
             next.startY = startY + length;
+        }
+        else {
+
+            if (horizontal) {
+                next.startX = startX + length;
+                next.startY = startY;
+            } else {
+                next.startX = startX;
+                next.startY = startY + length;
+            }
         }
     }
 

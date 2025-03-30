@@ -25,41 +25,66 @@ class SimulationPanel extends JPanel {
 
     private void initializeComponents() {
         // Création des routes
-        Road horizontalRoad = new Road(100, 300, 600, Color.GRAY, true, false);
-        Road horizontalRoad2 = new Road(100, 320, 600, Color.DARK_GRAY, true, true);
-        Road verticalRoad = new Road(390, 100, 400, Color.GRAY, false, true);
-        Road verticalRoad2 = new Road(410, 100, 400, Color.DARK_GRAY, false, false);
-        System.out.println("Vertical road " + verticalRoad);
+        Road horizontalRoadLeft = new Road(0, 300, 700, Color.GRAY, true, false);
+        Road horizontalRoadRight = new Road(0, 320, 700, Color.DARK_GRAY, true, true);
+        Road verticalRoadRight = new Road(390, 0, 500, Color.GRAY, false, true);
+        Road verticalRoadLeft = new Road(410, 0, 500, Color.DARK_GRAY, false, false);
 
-        // Création des routes avec virages
-        List<RoadSegment> rightTurnSegments = new ArrayList<>();
-        rightTurnSegments.add(new RoadSegment(700, 300, 100, true));
-        rightTurnSegments.add(new RoadSegment(800, 300, 100, false));
-        Road rightTurnRoad = new Road(rightTurnSegments, Color.GRAY);
+        // Virage a gauche sur la route horizontal
+        List<RoadSegment> horizontalLeftTurn = new ArrayList<>();
+        horizontalLeftTurn.add(new RoadSegment(700, 200, 100, false, true));
+        Road horizontalLeftTurnRoad = new Road(horizontalLeftTurn, Color.GRAY, true);
 
-        List<RoadSegment> sTurnSegments = new ArrayList<>();
-        sTurnSegments.add(new RoadSegment(410, 500, 100, false));
-        sTurnSegments.add(new RoadSegment(410, 600, 100, true));
-        Road sTurnRoad = new Road(sTurnSegments, Color.DARK_GRAY);
+        // Virage a gauche sur la route vertical
+        List<RoadSegment> verticalLeftTurn = new ArrayList<>();
+        verticalLeftTurn.add(new RoadSegment(410, 500, 100, true, false));
+        Road verticalLeftTurnRoad = new Road(verticalLeftTurn, Color.DARK_GRAY, false);
 
-        // Lier les routes principales aux routes avec virages
-        horizontalRoad.setNextRoad(rightTurnRoad);   // Route horizontale 1 → Virage à droite
-        verticalRoad2.setNextRoad(sTurnRoad);         // Route verticale 1 → Virage en S
 
-        // Lier les routes avec virages aux routes principales (pour boucler)
-        rightTurnRoad.setNextRoad(horizontalRoad);   // Après le virage, retour à la route horizontale
-        sTurnRoad.setNextRoad(verticalRoad2);         // Après le virage, retour à la route verticale
+        Road afterHorizontalLeftTurn = new Road(700, 200, 200, Color.GRAY, true, false);
+        Road afterVerticalRightTurn = new Road(290, 500, 200, Color.GRAY, false, false);
+        Road afterHorizontalRightTurn = new Road(700, 420, 200, Color.DARK_GRAY, true, false);
+        Road afterVerticalLeftTurn = new Road(510, 500, 200, Color.DARK_GRAY, false, false);
 
-        verticalRoad.setPairedRoad(verticalRoad2);
-        verticalRoad2.setPairedRoad(verticalRoad);
-        horizontalRoad.setPairedRoad(horizontalRoad2);
-        horizontalRoad2.setPairedRoad(horizontalRoad);
+        // Virage a droite sur la route horizontal
+        List<RoadSegment> horizontalRightTurn = new ArrayList<>();
+        horizontalRightTurn.add(new RoadSegment(700, 320, 100, false, false));
+        Road horizontalRightTurnRoad = new Road(horizontalRightTurn, Color.DARK_GRAY, false);
+
+        List<RoadSegment> verticalRightTurn = new ArrayList<>();
+        verticalRightTurn.add(new RoadSegment(290, 500, 100, true, true));
+        Road verticalRightTurnRoad = new Road(verticalRightTurn, Color.GRAY, true);
+
+        // Connexion virage a gauche route horizontal
+        horizontalRoadLeft.setNextRoad(horizontalLeftTurnRoad);
+        horizontalLeftTurnRoad.setNextRoad(afterHorizontalLeftTurn);
+        afterHorizontalLeftTurn.setNextRoad(horizontalRoadLeft);
+        // Connexion virage a droite route vertical
+        verticalRoadRight.setNextRoad(verticalRightTurnRoad);
+        verticalRightTurnRoad.setNextRoad(afterVerticalRightTurn);
+        afterVerticalRightTurn.setNextRoad(verticalRoadRight);
+
+        // Connexion virage a droite route horizontal
+        horizontalRoadRight.setNextRoad(horizontalRightTurnRoad);
+        horizontalRightTurnRoad.setNextRoad(afterHorizontalRightTurn);
+        afterHorizontalRightTurn.setNextRoad(horizontalRoadRight);
+
+        verticalRoadLeft.setNextRoad(verticalLeftTurnRoad);
+        verticalLeftTurnRoad.setNextRoad(afterVerticalLeftTurn);
+        afterVerticalLeftTurn.setNextRoad(verticalRoadLeft);
+
+        verticalRoadRight.setPairedRoad(verticalRoadLeft);
+        verticalRoadLeft.setPairedRoad(verticalRoadRight);
+        horizontalRoadRight.setPairedRoad(horizontalRoadLeft);
+        horizontalRoadLeft.setPairedRoad(horizontalRoadRight);
 
         // Ajouter toutes les routes à la liste
         roads.addAll(List.of(
-                horizontalRoad, horizontalRoad2,
-                verticalRoad, verticalRoad2,
-                rightTurnRoad, sTurnRoad
+                horizontalRoadRight, horizontalRoadLeft,
+                verticalRoadRight, verticalRoadLeft,
+                horizontalLeftTurnRoad, horizontalRightTurnRoad, afterHorizontalLeftTurn,
+                verticalRightTurnRoad, afterVerticalRightTurn, afterVerticalLeftTurn, afterHorizontalRightTurn,
+                verticalLeftTurnRoad
         ));
 
         int offset = 50;
