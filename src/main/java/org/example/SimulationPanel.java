@@ -39,7 +39,7 @@ class SimulationPanel extends JPanel {
 
         List<RoadSegment> sTurnSegments = new ArrayList<>();
         sTurnSegments.add(new RoadSegment(410, 500, 100, false));
-        sTurnSegments.add(new RoadSegment(410, 600, 200, true));
+        sTurnSegments.add(new RoadSegment(410, 600, 100, true));
         Road sTurnRoad = new Road(sTurnSegments, Color.DARK_GRAY, 2);
 
         // Lier les routes principales aux routes avec virages

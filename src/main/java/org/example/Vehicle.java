@@ -9,7 +9,6 @@ import java.util.stream.Collectors;
 class Vehicle {
     // Constantes de comportement
     private static final double SAFE_FOLLOW_DISTANCE = 60.0;
-    private static final double EMERGENCY_BRAKE_DISTANCE = 10.0;
     private static final int MAX_SPEED = 5;
     private static final double STOP_DISTANCE = 30.0;
     private static final int LANE_WIDTH = 20;
@@ -17,8 +16,6 @@ class Vehicle {
     public static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 70;
     private static final int LANE_CHANGE_COOLDOWN = 100;
     private int laneChangeTimer = 0;
-    private boolean isOvertaking = false;
-    private int maxSpeed = 8;
 
     public Road currentRoad;
     private int position;
@@ -91,13 +88,12 @@ class Vehicle {
         });
 
         Optional<TrafficLight> lightOpt = (Optional<TrafficLight>) beliefs.get("nextTrafficLight");
-        if (canOvertake() && isInRightLane && !lightOpt.isPresent() && beliefs.containsKey("frontVehicle")) {
-            desires.add("maintainSpeed");
-            desires.add("overtake");
-        }
 
-        else if(isAdjacentLaneClear() && !isInRightLane && !lightOpt.isPresent() ) {
+        if(isAdjacentLaneClear() && !isInRightLane && !lightOpt.isPresent() ) {
             desires.add("changeLane");
+        }
+        else if(!isAdjacentLaneClear() && !isInRightLane && !lightOpt.isPresent()) {
+            desires.add("accelerate");
         }
 
         lightOpt.ifPresent(light -> {
@@ -140,24 +136,7 @@ class Vehicle {
         if(desires.isEmpty()) desires.add("maintainSpeed");
     }
 
-    private boolean canOvertake() {
-        if(isAdjacentLaneClear()){
-            return true;
-        }
-        if (isOvertaking || currentRoad.isRightLane() || laneChangeTimer > 0)
-            return false;
 
-        Optional<Vehicle> frontVehicleOpt = (Optional<Vehicle>) beliefs.get("frontVehicle");
-        if (!frontVehicleOpt.isPresent() || speed <= frontVehicleOpt.get().speed)
-            return false;
-
-        // Vérifier la distance de sécurité
-        double distance = distanceTo(frontVehicleOpt.get());
-        if (distance > SAFE_FOLLOW_DISTANCE)
-            return false;
-
-        return true;
-    }
 
     private boolean isAdjacentLaneClear() {
         Road paired = currentRoad.getPairedRoad();
@@ -168,18 +147,6 @@ class Vehicle {
         );
     }
 
-    void overtake() {
-        if (!isInRightLane) {
-            speed = Math.min(speed + 2, maxSpeed); // Accelerate during overtake
-            isOvertaking = true;
-            isInRightLane = !isInRightLane; // Switch lanes
-            laneOffset += currentRoad.isHorizontal() ? LANE_WIDTH/8 : -LANE_WIDTH/8;
-            currentRoad = currentRoad.getPairedRoad();
-
-        }
-        isOvertaking = false;
-        desires.remove("overtake");
-    }
 
     void changeLane() {
         if(isAdjacentLaneClear()) {
@@ -205,13 +172,10 @@ class Vehicle {
             speed = Math.max(speed - 1, 1);
         }
 
-
         else if(desires.contains("accelerate")) {
-            speed = Math.max(speed + 1, 6);
+            speed = MAX_SPEED;
         }
-        else if(desires.contains("overtake")) {
-            overtake();
-        }
+
         else if(desires.contains("changeLane")) {
             changeLane();
         }
