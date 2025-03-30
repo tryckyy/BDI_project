@@ -9,13 +9,13 @@ import java.util.stream.Collectors;
 class SimulationPanel extends JPanel {
     private List<Vehicle> vehicles = new ArrayList<>();
     private List<TrafficLight> trafficLights = new ArrayList<>();
-    private List<Road> roads = new ArrayList<>();
-
+    List<Road> roads = new ArrayList<>();
     private enum Phase { HORIZONTAL_GREEN, HORIZONTAL_ORANGE, ALL_RED, VERTICAL_GREEN, VERTICAL_ORANGE }
     private Phase currentPhase = Phase.HORIZONTAL_GREEN;
     private int phaseTimer = 0;
     private static final int GREEN_DURATION = 200; // Adjust as needed
     private static final int ORANGE_DURATION = 50;
+    private List<String> messages = new ArrayList<>();
     private static final int ALL_RED_DURATION = 30;
 
     public SimulationPanel() {
@@ -30,53 +30,57 @@ class SimulationPanel extends JPanel {
         Road verticalRoadRight = new Road(390, 0, 500, Color.GRAY, false, true);
         Road verticalRoadLeft = new Road(410, 0, 500, Color.DARK_GRAY, false, false);
 
+
         // Virage a gauche sur la route horizontal
         List<RoadSegment> horizontalLeftTurn = new ArrayList<>();
         horizontalLeftTurn.add(new RoadSegment(700, 200, 100, false, true));
-        Road horizontalLeftTurnRoad = new Road(horizontalLeftTurn, Color.GRAY, true);
+        Road horizontalLeftTurnRoad = new Road(horizontalLeftTurn, Color.GRAY, true, false);
 
         // Virage a gauche sur la route vertical
         List<RoadSegment> verticalLeftTurn = new ArrayList<>();
         verticalLeftTurn.add(new RoadSegment(410, 500, 100, true, false));
-        Road verticalLeftTurnRoad = new Road(verticalLeftTurn, Color.DARK_GRAY, false);
+        Road verticalLeftTurnRoad = new Road(verticalLeftTurn, Color.DARK_GRAY, false, false);
 
 
         Road afterHorizontalLeftTurn = new Road(700, 200, 200, Color.GRAY, true, false);
-        Road afterVerticalRightTurn = new Road(290, 500, 200, Color.GRAY, false, false);
-        Road afterHorizontalRightTurn = new Road(700, 420, 200, Color.DARK_GRAY, true, false);
+        Road afterVerticalRightTurn = new Road(290, 500, 200, Color.GRAY, false, true);
+        Road afterHorizontalRightTurn = new Road(700, 420, 200, Color.DARK_GRAY, true, true);
         Road afterVerticalLeftTurn = new Road(510, 500, 200, Color.DARK_GRAY, false, false);
 
         // Virage a droite sur la route horizontal
         List<RoadSegment> horizontalRightTurn = new ArrayList<>();
         horizontalRightTurn.add(new RoadSegment(700, 320, 100, false, false));
-        Road horizontalRightTurnRoad = new Road(horizontalRightTurn, Color.DARK_GRAY, false);
+        Road horizontalRightTurnRoad = new Road(horizontalRightTurn, Color.DARK_GRAY, false, true);
 
         List<RoadSegment> verticalRightTurn = new ArrayList<>();
         verticalRightTurn.add(new RoadSegment(290, 500, 100, true, true));
-        Road verticalRightTurnRoad = new Road(verticalRightTurn, Color.GRAY, true);
+        Road verticalRightTurnRoad = new Road(verticalRightTurn, Color.GRAY, true, true);
 
-        // Connexion virage a gauche route horizontal
-        horizontalRoadLeft.setNextRoad(horizontalLeftTurnRoad);
-        horizontalLeftTurnRoad.setNextRoad(afterHorizontalLeftTurn);
-        afterHorizontalLeftTurn.setNextRoad(horizontalRoadLeft);
+        horizontalRoadLeft.addNextRoad(horizontalLeftTurnRoad);
+        horizontalLeftTurnRoad.addNextRoad(afterHorizontalLeftTurn);
+        afterHorizontalLeftTurn.addNextRoad(horizontalRoadLeft);
         // Connexion virage a droite route vertical
-        verticalRoadRight.setNextRoad(verticalRightTurnRoad);
-        verticalRightTurnRoad.setNextRoad(afterVerticalRightTurn);
-        afterVerticalRightTurn.setNextRoad(verticalRoadRight);
+        verticalRoadRight.addNextRoad(verticalRightTurnRoad);
+        verticalRightTurnRoad.addNextRoad(afterVerticalRightTurn);
+        afterVerticalRightTurn.addNextRoad(verticalRoadRight);
 
         // Connexion virage a droite route horizontal
-        horizontalRoadRight.setNextRoad(horizontalRightTurnRoad);
-        horizontalRightTurnRoad.setNextRoad(afterHorizontalRightTurn);
-        afterHorizontalRightTurn.setNextRoad(horizontalRoadRight);
+        horizontalRoadRight.addNextRoad(horizontalRightTurnRoad);
+        horizontalRightTurnRoad.addNextRoad(afterHorizontalRightTurn);
+        afterHorizontalRightTurn.addNextRoad(horizontalRoadRight);
 
-        verticalRoadLeft.setNextRoad(verticalLeftTurnRoad);
-        verticalLeftTurnRoad.setNextRoad(afterVerticalLeftTurn);
-        afterVerticalLeftTurn.setNextRoad(verticalRoadLeft);
+        verticalRoadLeft.addNextRoad(verticalLeftTurnRoad);
+        verticalLeftTurnRoad.addNextRoad(afterVerticalLeftTurn);
+        afterVerticalLeftTurn.addNextRoad(verticalRoadLeft);
 
         verticalRoadRight.setPairedRoad(verticalRoadLeft);
         verticalRoadLeft.setPairedRoad(verticalRoadRight);
         horizontalRoadRight.setPairedRoad(horizontalRoadLeft);
         horizontalRoadLeft.setPairedRoad(horizontalRoadRight);
+
+        afterHorizontalLeftTurn.setPairedRoad(afterHorizontalRightTurn);
+        afterHorizontalRightTurn.setPairedRoad(afterHorizontalLeftTurn);
+
 
         // Ajouter toutes les routes à la liste
         roads.addAll(List.of(
@@ -86,6 +90,42 @@ class SimulationPanel extends JPanel {
                 verticalRightTurnRoad, afterVerticalRightTurn, afterVerticalLeftTurn, afterHorizontalRightTurn,
                 verticalLeftTurnRoad
         ));
+
+        List<Road> mainRoads = List.of(
+                horizontalRoadLeft,
+                horizontalRoadRight,
+                verticalRoadRight,
+                verticalRoadLeft
+        );
+
+        List<Road> targetDestinations = roads.stream()
+                .filter(r -> r.getLength() == 200)
+                .collect(Collectors.toList());
+
+        mainRoads.forEach(road -> {
+            for (int i = 0; i < 1; i++) {
+                List<Road> possibleDestinations;
+
+                // Destinations possibles : mêmes type (horizontale/verticale) et longueur 200
+                if (road.isHorizontal()) {
+                    possibleDestinations = targetDestinations.stream()
+                            .filter(r -> r.isHorizontal() && r != road)
+                            .collect(Collectors.toList());
+                } else {
+                    possibleDestinations = targetDestinations.stream()
+                            .filter(r -> !r.isHorizontal() && r != road)
+                            .collect(Collectors.toList());
+                }
+
+                if (possibleDestinations.isEmpty()) continue;
+
+                Road destination = possibleDestinations.get(
+                        new Random().nextInt(possibleDestinations.size())
+                );
+                Vehicle v = new Vehicle(road, i * 80, 2, this, destination);
+                vehicles.add(v);
+            }
+        });
 
         int offset = 50;
 
@@ -120,19 +160,31 @@ class SimulationPanel extends JPanel {
         ));
 
 
+
         // Création des véhicules
-        roads.forEach(road -> {
+        /*roads.forEach(road -> {
             for(int i = 0; i < 1; i++) {
                 Vehicle v = new Vehicle(road, i * 80, 2, this);
                 vehicles.add(v);
             }
-        });
+        });*/
     }
 
 
     public void updateSimulation() {
         manageTrafficLights();
         vehicles.forEach(Vehicle::update);
+
+        List<Vehicle> arrived = vehicles.stream()
+                .filter(Vehicle::hasReachedDestination)
+                .collect(Collectors.toList());
+
+
+        vehicles.removeAll(arrived);
+        arrived.forEach(v ->
+                messages.add("Destination atteinte")
+        );
+
     }
 
     public List<Vehicle> getVehiclesOnRoad(Road road) {
@@ -211,6 +263,12 @@ class SimulationPanel extends JPanel {
         roads.forEach(r -> r.draw(g));
         trafficLights.forEach(t -> t.draw(g));
         vehicles.forEach(v -> v.draw(g));
+        g.setColor(Color.RED);
+        int yPos = 30;
+        for (String msg : messages) {
+            g.drawString(msg, 10, yPos);
+            yPos += 15;
+        }
     }
 
     public List<Vehicle> getNearbyVehicles(Vehicle requester) {

@@ -1,16 +1,17 @@
 package org.example;
 
 import java.awt.*;
-import java.util.ArrayList;
+import java.util.*;
 import java.util.List;
 
 public class Road {
     private List<RoadSegment> segments;
     private Color color;
-    private Road nextRoad;
+
     private boolean isRightLane;
     private Road pairedRoad;
     private boolean reverse;
+    private List<Road> nextRoads = new ArrayList<>();
 
     public Road getPairedRoad() { return pairedRoad; }
     public void setPairedRoad(Road pairedRoad) { this.pairedRoad = pairedRoad; }
@@ -20,11 +21,21 @@ public class Road {
     }
 
 
+    public void addNextRoad(Road nextRoad) {
+        if (!nextRoads.contains(nextRoad)) {
+            nextRoads.add(nextRoad);
+        }
+    }
 
-    public Road(List<RoadSegment> segments, Color color, boolean reverse) {
+    public List<Road> getNextRoads() {
+        return Collections.unmodifiableList(nextRoads);
+    }
+
+    public Road(List<RoadSegment> segments, Color color, boolean reverse, boolean isRightLane) {
         this.segments = segments;
         this.color = color;
         this.reverse = reverse;
+        this.isRightLane = isRightLane;
         connectSegments();
     }
 
@@ -41,8 +52,9 @@ public class Road {
         connectSegments();
     }
 
-    public Road getNextRoad() { return nextRoad; }
-    public void setNextRoad(Road nextRoad) { this.nextRoad = nextRoad; }
+
+
+
 
     private void connectSegments() {
         for(int i = 1; i < segments.size(); i++) {

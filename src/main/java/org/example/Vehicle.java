@@ -3,6 +3,7 @@ package org.example;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
+import java.util.stream.Collectors;
 
 
 class Vehicle {
@@ -12,9 +13,13 @@ class Vehicle {
     private static final double STOP_DISTANCE = 60.0;
     private static final int LANE_WIDTH = 20;
     public static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 70;
+    private int laneChangeCooldown = 0;
+    private static final int LANE_CHANGE_DELAY = 30;
 
     public Road currentRoad;
+    private Road destination;
     private int position;
+    private boolean reachedDestination = false;
     private int baseSpeed = 2;
     private int speed;
     private boolean isInRightLane;
@@ -26,11 +31,12 @@ class Vehicle {
     private Map<String, Object> beliefs = new HashMap<>();
     private List<String> desires = new ArrayList<>();
 
-    public Vehicle(Road road, int initialPos, int speed, SimulationPanel environment) {
+    public Vehicle(Road road, int initialPos, int speed, SimulationPanel environment, Road destination) {
         this.currentRoad = road;
         this.position = initialPos;
         this.speed = speed;
         this.environment = environment;
+        this.destination = destination;
         this.color = new Color(
                 (int)(Math.random() * 200 + 55),
                 (int)(Math.random() * 200 + 55),
@@ -39,11 +45,32 @@ class Vehicle {
         this.isInRightLane = currentRoad.isRightLane();
     }
 
+    public boolean hasReachedDestination() {
+        return reachedDestination;
+    }
+
+    private void checkDestination() {
+        if (currentRoad == destination) {
+            if (currentRoad.isReverse()) {
+                if (position <= 0) { // Fin de route en mode reverse
+                    reachedDestination = true;
+                }
+            } else {
+                if (position >= currentRoad.getLength()) { // Fin de route normale
+                    reachedDestination = true;
+                }
+            }
+        }
+    }
+
+
     public void update() {
         perceiveEnvironment();
         evaluateDesires();
         executeIntention();
         move();
+        checkDestination();
+        if (laneChangeCooldown > 0) laneChangeCooldown--;
     }
 
     private void perceiveEnvironment() {
@@ -54,12 +81,36 @@ class Vehicle {
                 .filter(this::isAheadOf)
                 .min(Comparator.comparingDouble(this::distanceTo)));
 
-
+        if(destination.isRightLane() && !currentRoad.isRightLane()) {
+            beliefs.put("shouldChangeLane", true);
+            isInRightLane = true;
+        }
+        else if(!destination.isRightLane() && currentRoad.isRightLane()) {
+            beliefs.put("shouldChangeLane", true);
+            isInRightLane = false;
+        }
+        else {
+            beliefs.remove("shouldChangeLane");
+        }
+        // Condition stricte : changer de voie uniquement si la destination est dans la voie jumelle
     }
 
 
     private void evaluateDesires() {
         desires.clear();
+
+        if (beliefs.containsKey("shouldChangeLane") && !isInRightLane && !isAdjacentLaneClear()) {
+            desires.add("decelerate");
+        }
+        else if(beliefs.containsKey("shouldChangeLane") && !isInRightLane && isAdjacentLaneClear()) {
+            desires.add("changeLane");
+        }
+        else if(beliefs.containsKey("shouldChangeLane") && isInRightLane && !isAdjacentLaneClear()) {
+            desires.add("accelerate");
+        }
+        else if(beliefs.containsKey("shouldChangeLane") && isInRightLane && isAdjacentLaneClear()) {
+            desires.add("changeLane");
+        }
 
         // Évaluation des véhicules précédents
         Optional<Vehicle> frontVehicle = (Optional<Vehicle>) beliefs.get("frontVehicle");
@@ -75,13 +126,6 @@ class Vehicle {
         });
 
         Optional<TrafficLight> lightOpt = (Optional<TrafficLight>) beliefs.get("nextTrafficLight");
-        if(isAdjacentLaneClear() && !isInRightLane && !lightOpt.isPresent() ) {
-            desires.add("changeLane");
-        }
-        else if(!isAdjacentLaneClear() && !isInRightLane && !lightOpt.isPresent()) {
-            desires.add("accelerate");
-        }
-
 
         lightOpt.ifPresent(light -> {
             TrafficLight.State lightState = light.getState();
@@ -118,9 +162,9 @@ class Vehicle {
         });
 
 
-
         if(desires.isEmpty()) desires.add("maintainSpeed");
     }
+
 
 
 
@@ -134,13 +178,20 @@ class Vehicle {
     }
 
 
+
     void changeLane() {
-        if(isAdjacentLaneClear()) {
-            currentRoad = currentRoad.getPairedRoad();
-            isInRightLane = !isInRightLane;
-            laneOffset += currentRoad.isHorizontal() ? LANE_WIDTH/8 : -LANE_WIDTH/8;
+        Road pairedRoad = currentRoad.getPairedRoad();
+        if (pairedRoad == null) return;
+
+
+        if (isAdjacentLaneClear()) {
+            currentRoad = pairedRoad;
+            isInRightLane = currentRoad.isRightLane();
+            laneOffset = currentRoad.isHorizontal() ? LANE_WIDTH / 8 : -LANE_WIDTH / 8;
         }
-    }
+        }
+
+
 
 
     private void executeIntention() {
@@ -159,6 +210,8 @@ class Vehicle {
         else if(desires.contains("changeLane")) {
             changeLane();
         }
+
+
         if(desires.contains("fullStop")) {
             speed = 0;
         }
@@ -167,37 +220,27 @@ class Vehicle {
 
     private void move() {
 
-        if(currentRoad.isReverse() && position >= -currentRoad.getLength()) {
+        if (currentRoad.isReverse() && position >= -currentRoad.getLength()) {
             position -= speed;
-        }
-            else if(position < -currentRoad.getLength()) {
-                if(currentRoad.getNextRoad() != null) {
-                    currentRoad = currentRoad.getNextRoad();
-                    isInRightLane = currentRoad.isRightLane();
-                    position = 0;
-                }
+        } else if (position < -currentRoad.getLength()) {
+            if (!currentRoad.getNextRoads().isEmpty()) {
+                currentRoad = currentRoad.getNextRoads().get(0); // Prend la première route suivante
+                isInRightLane = currentRoad.isRightLane();
+                position = 0;
             }
-
-        else {
+        } else {
             position += speed;
             if (position > currentRoad.getLength()) {
-                if (currentRoad.getNextRoad() != null) {
-                    // Passer à la prochaine route et réinitialiser la position
-                    currentRoad = currentRoad.getNextRoad();
-                    isInRightLane = currentRoad.isRightLane();
+                if (!currentRoad.getNextRoads().isEmpty()) {
+                    currentRoad = currentRoad.getNextRoads().get(0);
                     position = 0;
                 } else {
-                    // Si aucune route suivante, boucler sur la même route
                     position %= currentRoad.getLength();
                 }
             }
         }
-
-
-
-
-
     }
+
 
 
     // Méthodes utilitaires
