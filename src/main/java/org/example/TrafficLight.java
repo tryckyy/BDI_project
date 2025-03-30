@@ -1,6 +1,5 @@
 package org.example;
 
-import javax.swing.text.Position;
 import java.awt.*;
 
 class TrafficLight {
@@ -12,7 +11,6 @@ class TrafficLight {
     private final Direction direction;
     private final Point stopLinePosition;
     private State state;
-    private int timer;
 
     Point getPosition() {
         return new Point (x, y);
@@ -38,12 +36,6 @@ class TrafficLight {
         this.state = newState;
     }
 
-    public void update() {
-        if(timer++ > 100) {
-            state = (state == State.RED) ? State.GREEN : State.RED;
-            timer = 0;
-        }
-    }
 
     public void draw(Graphics g) {
         // Dessiner le feu
@@ -67,17 +59,6 @@ class TrafficLight {
         }
     }
 
-    public boolean isInRange(int vehicleX, int vehicleY) {
-        return switch(direction) {
-            case HORIZONTAL ->
-                    Math.abs(vehicleY - y) < 15 &&  // Alignement vertical
-                            vehicleX >= x - 50 && vehicleX <= x + 50;  // Portée avant/après
-
-            case VERTICAL ->
-                    Math.abs(vehicleX - x) < 30 &&  // Couvre les 2 voies (15px chaque côté)
-                            vehicleY >= y - 50 && vehicleY <= y + 50;
-        };
-    }
 
     public boolean isInPath(Point vehicleFront, boolean isVehicleHorizontal) {
         // Vérifier la cohérence de direction
