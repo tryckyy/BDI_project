@@ -3,19 +3,16 @@ package org.example;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
-import java.util.stream.Collectors;
 
 
 class Vehicle {
     // Constantes de comportement
-    private static final double SAFE_FOLLOW_DISTANCE = 60.0;
+    private static final double SAFE_FOLLOW_DISTANCE = 120.0;
     private static final int MAX_SPEED = 5;
     private static final double STOP_DISTANCE = 60.0;
     private static final int LANE_WIDTH = 20;
     private static final int LOOK_AHEAD = 80;
     public static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 70;
-    private static final int LANE_CHANGE_COOLDOWN = 100;
-    private int laneChangeTimer = 0;
 
     public Road currentRoad;
     private int position;
@@ -48,7 +45,6 @@ class Vehicle {
         evaluateDesires();
         executeIntention();
         move();
-        if (laneChangeTimer > 0) laneChangeTimer--;
     }
 
     private void perceiveEnvironment() {
@@ -79,10 +75,10 @@ class Vehicle {
         frontVehicle.ifPresent(v -> {
 
             double distance = distanceTo(v);
-            if(distance < 60.0) {
+            if(distance < STOP_DISTANCE) {
                 desires.add("fullStop");
             }
-            else if(distance < 120.0) {
+            else if(distance < SAFE_FOLLOW_DISTANCE) {
                 desires.add("decelerate");
             }
         });
