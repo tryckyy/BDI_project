@@ -58,17 +58,9 @@ class Vehicle {
 
     }
 
-    private int currentMaxSpeed() {
-        return currentRoad.getSpeedLimit();
-    }
 
     private void evaluateDesires() {
         desires.clear();
-
-
-
-        // Évaluation des feux rouges
-
 
         // Évaluation des véhicules précédents
         Optional<Vehicle> frontVehicle = (Optional<Vehicle>) beliefs.get("frontVehicle");
@@ -154,11 +146,6 @@ class Vehicle {
     }
 
 
-
-    private double getPositionDistance(Vehicle other) {
-        return other.position - this.position;
-    }
-
     private void executeIntention() {
         if (desires.contains("maintainSpeed")) {
             speed = baseSpeed;
@@ -195,39 +182,6 @@ class Vehicle {
         }
     }
 
-    private Optional<Road> detectUpcomingSpeedLimitChange() {
-        final int LOOK_AHEAD = 80; // Distance de détection en pixels
-        Point front = getFrontPosition();
-
-        return environment.getRoads().stream()
-                .filter(road -> road != currentRoad)
-                .filter(road -> isRoadInPath(road, front))
-                .filter(road -> road.getSpeedLimit() != currentRoad.getSpeedLimit())
-                .findFirst();
-    }
-
-    public int getRoadPosition() {
-        return position;
-    }
-
-
-
-    private boolean isRoadInPath(Road road, Point vehicleFront) {
-        boolean sameDirection = (currentRoad.isHorizontal() == road.isHorizontal());
-        Point roadStart = road.getStartPoint();
-
-        if(currentRoad.isHorizontal()) {
-            return sameDirection &&
-                    Math.abs(roadStart.y - vehicleFront.y) < 30 &&
-                    roadStart.x > vehicleFront.x &&
-                    roadStart.x - vehicleFront.x < LOOK_AHEAD;
-        } else {
-            return sameDirection &&
-                    Math.abs(roadStart.x - vehicleFront.x) < 30 &&
-                    roadStart.y > vehicleFront.y &&
-                    roadStart.y - vehicleFront.y < LOOK_AHEAD;
-        }
-    }
 
     // Méthodes utilitaires
     private boolean isAheadOf(Vehicle other) {

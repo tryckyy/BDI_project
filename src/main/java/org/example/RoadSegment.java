@@ -58,5 +58,4 @@ public class RoadSegment {
 
     public int getLength() { return length; }
     public boolean isHorizontal() { return horizontal; }
-    public RoadSegment getNextSegment() { return nextSegment; }
 }

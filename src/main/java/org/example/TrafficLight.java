@@ -78,13 +78,6 @@ class TrafficLight {
                             vehicleY >= y - 50 && vehicleY <= y + 50;
         };
     }
-    public int getX() {
-        return x;
-    }
-
-    public int getY() {
-        return y;
-    }
 
     public boolean isInPath(Point vehicleFront, boolean isVehicleHorizontal) {
         // Vérifier la cohérence de direction

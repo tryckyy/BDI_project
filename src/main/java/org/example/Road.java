@@ -5,9 +5,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class Road {
-    private List<RoadSegment> segments = new ArrayList<>();
+    private List<RoadSegment> segments;
     private Color color;
-    private int speedLimit;
     private Road nextRoad;
     private boolean isRightLane;
     private Road pairedRoad;
@@ -19,23 +18,18 @@ public class Road {
         return isRightLane;
     }
 
-    public Point getPositionAt(int progression) {
-        return getPosition(progression, 0);
-    }
 
 
-    public Road(List<RoadSegment> segments, Color color, int speedLimit) {
+    public Road(List<RoadSegment> segments, Color color) {
         this.segments = segments;
         this.color = color;
-        this.speedLimit = speedLimit;
         connectSegments();
     }
 
-    public Road(int startX, int startY, int length, Color color, boolean horizontal, int speedLimit, boolean isRightLane) {
+    public Road(int startX, int startY, int length, Color color, boolean horizontal, boolean isRightLane) {
         this.segments = new ArrayList<>();
         segments.add(new RoadSegment(startX, startY, length, horizontal));
         this.color = color;
-        this.speedLimit = speedLimit;
         this.isRightLane = isRightLane;
         connectSegments();
     }
@@ -53,11 +47,6 @@ public class Road {
         return segments.stream().mapToInt(RoadSegment::getLength).sum();
     }
 
-
-    public Point getStartPoint() {
-        if(segments.isEmpty()) return new Point(0, 0);
-        return new Point(segments.get(0).startX, segments.get(0).startY);
-    }
 
     public Point getPosition(int progression, int laneOffset) {
         int accumulated = 0;
@@ -86,23 +75,7 @@ public class Road {
         return segments.get(0);
     }
 
-    public int getSpeedLimit() { return speedLimit; }
     public boolean isHorizontal() { return !segments.isEmpty() && segments.get(0).isHorizontal(); }
-    public List<RoadSegment> getSegments() { return segments; }
 
-    public Rectangle getBounds() {
-        int minX = Integer.MAX_VALUE;
-        int minY = Integer.MAX_VALUE;
-        int maxX = Integer.MIN_VALUE;
-        int maxY = Integer.MIN_VALUE;
 
-        for(RoadSegment seg : segments) {
-            Rectangle bounds = seg.getBounds();
-            minX = Math.min(minX, bounds.x);
-            minY = Math.min(minY, bounds.y);
-            maxX = Math.max(maxX, bounds.x + bounds.width);
-            maxY = Math.max(maxY, bounds.y + bounds.height);
-        }
-        return new Rectangle(minX, minY, maxX - minX, maxY - minY);
-    }
 }

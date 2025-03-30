@@ -25,22 +25,22 @@ class SimulationPanel extends JPanel {
 
     private void initializeComponents() {
         // Création des routes
-        Road horizontalRoad = new Road(100, 300, 600, Color.GRAY, true, 2, false);
-        Road horizontalRoad2 = new Road(100, 320, 600, Color.DARK_GRAY, true, 2, true);
-        Road verticalRoad = new Road(390, 100, 400, Color.GRAY, false, 2, true);
-        Road verticalRoad2 = new Road(410, 100, 400, Color.DARK_GRAY, false, 2, false);
+        Road horizontalRoad = new Road(100, 300, 600, Color.GRAY, true, false);
+        Road horizontalRoad2 = new Road(100, 320, 600, Color.DARK_GRAY, true, true);
+        Road verticalRoad = new Road(390, 100, 400, Color.GRAY, false, true);
+        Road verticalRoad2 = new Road(410, 100, 400, Color.DARK_GRAY, false, false);
         System.out.println("Vertical road " + verticalRoad);
 
         // Création des routes avec virages
         List<RoadSegment> rightTurnSegments = new ArrayList<>();
         rightTurnSegments.add(new RoadSegment(700, 300, 100, true));
         rightTurnSegments.add(new RoadSegment(800, 300, 100, false));
-        Road rightTurnRoad = new Road(rightTurnSegments, Color.GRAY, 3);
+        Road rightTurnRoad = new Road(rightTurnSegments, Color.GRAY);
 
         List<RoadSegment> sTurnSegments = new ArrayList<>();
         sTurnSegments.add(new RoadSegment(410, 500, 100, false));
         sTurnSegments.add(new RoadSegment(410, 600, 100, true));
-        Road sTurnRoad = new Road(sTurnSegments, Color.DARK_GRAY, 2);
+        Road sTurnRoad = new Road(sTurnSegments, Color.DARK_GRAY);
 
         // Lier les routes principales aux routes avec virages
         horizontalRoad.setNextRoad(rightTurnRoad);   // Route horizontale 1 → Virage à droite
@@ -204,9 +204,6 @@ class SimulationPanel extends JPanel {
                 .collect(Collectors.toList());
     }
 
-    public List<Road> getRoads() {
-        return Collections.unmodifiableList(roads);
-    }
 
     public Optional<TrafficLight> getNextTrafficLight(Vehicle vehicle) {
         return trafficLights.stream()
