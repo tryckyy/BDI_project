@@ -10,7 +10,7 @@ class Vehicle {
     // Constantes de comportement
     private static final double SAFE_FOLLOW_DISTANCE = 60.0;
     private static final int MAX_SPEED = 5;
-    private static final double STOP_DISTANCE = 30.0;
+    private static final double STOP_DISTANCE = 60.0;
     private static final int LANE_WIDTH = 20;
     private static final int LOOK_AHEAD = 80;
     public static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 70;
