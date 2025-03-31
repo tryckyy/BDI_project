@@ -3,7 +3,6 @@ package org.example;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
-import java.util.stream.Collectors;
 
 
 class Vehicle {
@@ -13,23 +12,28 @@ class Vehicle {
     private static final double STOP_DISTANCE = 60.0;
     private static final int LANE_WIDTH = 20;
     public static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 70;
+    private final Road destination;
+    private final int baseSpeed = 2;
     private int laneChangeCooldown = 0;
-    private static final int LANE_CHANGE_DELAY = 30;
+    private Color color;
+    private final SimulationPanel environment;
+    private final long creationTime = System.currentTimeMillis(); // Temps de création
+    private int laneChangesCount = 0;
 
     public Road currentRoad;
-    private Road destination;
+
     private int position;
     private boolean reachedDestination = false;
-    private int baseSpeed = 2;
+
     private int speed;
     private boolean isInRightLane;
     public int laneOffset;
-    private SimulationPanel environment;
-    private Color color;
+
+
 
     // Système BDI
-    private Map<String, Object> beliefs = new HashMap<>();
-    private List<String> desires = new ArrayList<>();
+    private final Map<String, Object> beliefs = new HashMap<>();
+    private final List<String> desires = new ArrayList<>();
 
     public Vehicle(Road road, int initialPos, int speed, SimulationPanel environment, Road destination) {
         this.currentRoad = road;
@@ -74,7 +78,6 @@ class Vehicle {
     }
 
     private void perceiveEnvironment() {
-        // Perception des éléments environnementaux
         beliefs.put("nearbyVehicles", environment.getNearbyVehicles(this));
         beliefs.put("nextTrafficLight", environment.getNextTrafficLight(this));
         beliefs.put("frontVehicle", environment.getVehiclesInLane(this).stream()
@@ -92,7 +95,6 @@ class Vehicle {
         else {
             beliefs.remove("shouldChangeLane");
         }
-        // Condition stricte : changer de voie uniquement si la destination est dans la voie jumelle
     }
 
 
@@ -111,17 +113,30 @@ class Vehicle {
         else if(beliefs.containsKey("shouldChangeLane") && isInRightLane && isAdjacentLaneClear()) {
             desires.add("changeLane");
         }
+        else if(!beliefs.containsKey("shouldChangeLane") && !isInRightLane) {
+            desires.add("accelerate");
+        }
+        else if(!beliefs.containsKey("shouldChangeLane") && isInRightLane) {
+            desires.add("accelerate");
+        }
 
-        // Évaluation des véhicules précédents
         Optional<Vehicle> frontVehicle = (Optional<Vehicle>) beliefs.get("frontVehicle");
         frontVehicle.ifPresent(v -> {
 
             double distance = distanceTo(v);
-            if(distance < STOP_DISTANCE) {
-                desires.add("fullStop");
-            }
-            else if(distance < SAFE_FOLLOW_DISTANCE) {
-                desires.add("decelerate");
+            if(currentRoad.isReverse()) {
+                if(distance > STOP_DISTANCE) {
+                    desires.add("fullStop");
+                }
+                else if(distance > SAFE_FOLLOW_DISTANCE) {
+                    desires.add("decelerate");                }
+            } else {
+                if(distance < STOP_DISTANCE) {
+                    desires.add("fullStop");
+                }
+                else if(distance < SAFE_FOLLOW_DISTANCE) {
+                    desires.add("decelerate");
+                }
             }
         });
 
@@ -177,7 +192,11 @@ class Vehicle {
         );
     }
 
+    public int getLaneChangesCount() { return laneChangesCount; }
 
+    public long getTravelTime() {
+        return System.currentTimeMillis() - creationTime;
+    }
 
     void changeLane() {
         Road pairedRoad = currentRoad.getPairedRoad();
@@ -188,8 +207,10 @@ class Vehicle {
             currentRoad = pairedRoad;
             isInRightLane = currentRoad.isRightLane();
             laneOffset = currentRoad.isHorizontal() ? LANE_WIDTH / 8 : -LANE_WIDTH / 8;
+            laneChangesCount++;
+
         }
-        }
+    }
 
 
 
@@ -203,8 +224,11 @@ class Vehicle {
             speed = Math.max(speed - 1, 1);
         }
 
-        else if(desires.contains("accelerate")) {
+        else if(desires.contains("accelerate") && !isInRightLane) {
             speed = MAX_SPEED;
+        }
+        else if(desires.contains("accelerate") && isInRightLane) {
+            speed = MAX_SPEED - 1;
         }
 
         else if(desires.contains("changeLane")) {
@@ -243,7 +267,6 @@ class Vehicle {
 
 
 
-    // Méthodes utilitaires
     private boolean isAheadOf(Vehicle other) {
         if(currentRoad.isHorizontal()) {
             return this.getFrontPosition().x < other.getFrontPosition().x;
@@ -257,14 +280,12 @@ class Vehicle {
         Point frontPos = getFrontPosition();
 
         if (currentRoad.isHorizontal()) {
-            // Vérifier l'alignement sur la même voie verticale (Y)
             boolean sameLane = Math.abs(frontPos.y - lightPos.y) <= LANE_WIDTH;
             return sameLane && (
                     (speed > 0 && frontPos.x < lightPos.x) ||
                             (speed < 0 && frontPos.x > lightPos.x)
             );
         } else {
-            // Vérifier l'alignement sur la même voie horizontale (X)
             boolean sameLane = Math.abs(frontPos.x - lightPos.x) <= LANE_WIDTH;
             return sameLane && (
                     (speed > 0 && frontPos.y < lightPos.y) ||
@@ -286,13 +307,13 @@ class Vehicle {
     }
 
     public Point getFrontPosition() {
-        Point pos = getPosition(); // Contient déjà le laneOffset
-        int frontOffset = speed > 0 ? 15 : -15; // Déplacement selon la direction
+        Point pos = getPosition();
+        int frontOffset = speed > 0 ? 15 : -15;
 
         if (currentRoad.isHorizontal()) {
-            return new Point(pos.x + frontOffset, pos.y); // Ne pas ajouter laneOffset ici
+            return new Point(pos.x + frontOffset, pos.y);
         } else {
-            return new Point(pos.x, pos.y + frontOffset); // Ne pas ajouter laneOffset ici
+            return new Point(pos.x, pos.y + frontOffset);
         }
     }
 
@@ -316,5 +337,24 @@ class Vehicle {
                 g.fillRect(pos.x - 5, pos.y - 10, 10, 20);
             }
         }
+        int textOffsetX = 15;
+        int textOffsetY = -5;
+
+        if (isHorizontal) {
+            if (currentRoad.isReverse()) {
+                textOffsetX = 30; // À gauche si segment inversé
+            }
+        } else {
+            textOffsetY = 15; // En dessous pour les segments verticaux
+            if (currentRoad.isReverse()) {
+                textOffsetY = 100; // Au-dessus si segment inversé
+            }
+        }
+
+        // Affichage des métriques ajusté
+        g.setColor(Color.BLACK);
+        String metrics = String.format("C: %d | T: %.1fs", laneChangesCount, getTravelTime() / 1000.0);
+        g.drawString(metrics, pos.x + textOffsetX, pos.y + textOffsetY);
+
     }
 }

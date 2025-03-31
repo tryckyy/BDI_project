@@ -1,6 +1,7 @@
 package org.example;
 
 import javax.swing.*;
+import javax.swing.Timer;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
@@ -9,14 +10,15 @@ import java.util.stream.Collectors;
 class SimulationPanel extends JPanel {
     private List<Vehicle> vehicles = new ArrayList<>();
     private List<TrafficLight> trafficLights = new ArrayList<>();
-    List<Road> roads = new ArrayList<>();
+    public List<Road> roads = new ArrayList<>();
     private enum Phase { HORIZONTAL_GREEN, HORIZONTAL_ORANGE, ALL_RED, VERTICAL_GREEN, VERTICAL_ORANGE }
     private Phase currentPhase = Phase.HORIZONTAL_GREEN;
     private int phaseTimer = 0;
     private static final int GREEN_DURATION = 200; // Adjust as needed
     private static final int ORANGE_DURATION = 50;
-    private List<String> messages = new ArrayList<>();
     private static final int ALL_RED_DURATION = 30;
+    private final Map<Vehicle, Long> travelTimes = new HashMap<>(); // Temps de trajet par véhicule
+    private final Map<Vehicle, Integer> laneChanges = new HashMap<>(); // Changements de voie par véhicule
 
     public SimulationPanel() {
         initializeComponents();
@@ -78,8 +80,6 @@ class SimulationPanel extends JPanel {
         horizontalRoadRight.setPairedRoad(horizontalRoadLeft);
         horizontalRoadLeft.setPairedRoad(horizontalRoadRight);
 
-        afterHorizontalLeftTurn.setPairedRoad(afterHorizontalRightTurn);
-        afterHorizontalRightTurn.setPairedRoad(afterHorizontalLeftTurn);
 
 
         // Ajouter toutes les routes à la liste
@@ -98,34 +98,22 @@ class SimulationPanel extends JPanel {
                 verticalRoadLeft
         );
 
-        List<Road> targetDestinations = roads.stream()
-                .filter(r -> r.getLength() == 200)
-                .collect(Collectors.toList());
+
+        int carsPerLane = 3; // 3 voitures par voie
+        int spawnDelay = 10000; // Délai de 2 secondes
 
         mainRoads.forEach(road -> {
-            for (int i = 0; i < 1; i++) {
-                List<Road> possibleDestinations;
+            // Première voiture immédiate
+            createAndAddVehicle(road);
 
-                // Destinations possibles : mêmes type (horizontale/verticale) et longueur 200
-                if (road.isHorizontal()) {
-                    possibleDestinations = targetDestinations.stream()
-                            .filter(r -> r.isHorizontal() && r != road)
-                            .collect(Collectors.toList());
-                } else {
-                    possibleDestinations = targetDestinations.stream()
-                            .filter(r -> !r.isHorizontal() && r != road)
-                            .collect(Collectors.toList());
-                }
-
-                if (possibleDestinations.isEmpty()) continue;
-
-                Road destination = possibleDestinations.get(
-                        new Random().nextInt(possibleDestinations.size())
-                );
-                Vehicle v = new Vehicle(road, i * 80, 2, this, destination);
-                vehicles.add(v);
+            // Ajout des voitures suivantes avec délai
+            for (int i = 1; i < carsPerLane; i++) {
+                Timer timer = new Timer(i * spawnDelay, e -> createAndAddVehicle(road));
+                timer.setRepeats(false);
+                timer.start();
             }
         });
+
 
         int offset = 50;
 
@@ -160,15 +148,35 @@ class SimulationPanel extends JPanel {
         ));
 
 
-
-        // Création des véhicules
-        /*roads.forEach(road -> {
-            for(int i = 0; i < 1; i++) {
-                Vehicle v = new Vehicle(road, i * 80, 2, this);
-                vehicles.add(v);
-            }
-        });*/
     }
+
+    private void createAndAddVehicle(Road road) {
+        List<Road> targetDestinations = roads.stream()
+                .filter(r -> r.getLength() == 200)
+                .collect(Collectors.toList());
+
+        List<Road> possibleDestinations;
+
+        if (road.isHorizontal()) {
+            possibleDestinations = targetDestinations.stream()
+                    .filter(r -> r.isHorizontal() && r != road)
+                    .collect(Collectors.toList());
+        } else {
+            possibleDestinations = targetDestinations.stream()
+                    .filter(r -> !r.isHorizontal() && r != road)
+                    .collect(Collectors.toList());
+        }
+
+        if (!possibleDestinations.isEmpty()) {
+            Road destination = possibleDestinations.get(
+                    new Random().nextInt(possibleDestinations.size())
+            );
+            Vehicle v = new Vehicle(road, 0, 2, this, destination); // Position de départ à 0
+            vehicles.add(v);
+        }
+    }
+
+
 
 
     public void updateSimulation() {
@@ -181,9 +189,14 @@ class SimulationPanel extends JPanel {
 
 
         vehicles.removeAll(arrived);
-        arrived.forEach(v ->
-                messages.add("Destination atteinte")
-        );
+
+        arrived.forEach(v -> {
+                travelTimes.put(v, v.getTravelTime() );
+                laneChanges.put(v, v.getLaneChangesCount());
+        }
+                );
+
+        vehicles.removeAll(arrived);
 
     }
 
@@ -265,10 +278,22 @@ class SimulationPanel extends JPanel {
         vehicles.forEach(v -> v.draw(g));
         g.setColor(Color.RED);
         int yPos = 30;
-        for (String msg : messages) {
-            g.drawString(msg, 10, yPos);
+        g.drawString("Métriques Globales :", 10, yPos);
+        yPos += 15;
+        g.drawString("Véhicules arrivés: " + travelTimes.size(), 10, yPos  );
+        yPos += 15;
+
+
+        if (!travelTimes.isEmpty()) {
+            double avgTravelTime = travelTimes.values().stream().mapToLong(Long::longValue).average().orElse(0) / 1000;
+            double avgLaneChanges = laneChanges.values().stream().mapToInt(Integer::intValue).average().orElse(0);
+
+            g.drawString(String.format("Temps moyen de trajet: %.1f s", avgTravelTime), 10, yPos);
             yPos += 15;
+            g.drawString(String.format("Changements de voie moyens: %.1f", avgLaneChanges), 10, yPos);
         }
+
+
     }
 
     public List<Vehicle> getNearbyVehicles(Vehicle requester) {
