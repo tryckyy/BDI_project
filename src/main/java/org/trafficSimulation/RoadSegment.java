@@ -1,4 +1,4 @@
-package org.example;
+package org.trafficSimulation;
 
 import java.awt.*;
 

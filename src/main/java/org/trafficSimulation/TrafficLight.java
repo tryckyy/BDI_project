@@ -1,4 +1,4 @@
-package org.example;
+package org.trafficSimulation;
 
 import java.awt.*;
 
@@ -38,7 +38,6 @@ class TrafficLight {
 
 
     public void draw(Graphics g) {
-        // Dessiner le feu
         g.setColor(Color.BLACK);
         g.fillRect(x - 3, y - 3, 26, 26);
         if (state == State.RED) {
@@ -46,11 +45,10 @@ class TrafficLight {
         } else if (state == State.GREEN) {
             g.setColor(Color.GREEN);
         } else {
-            g.setColor(Color.ORANGE); // Orange for ORANGE state
+            g.setColor(Color.ORANGE);
         }
         g.fillRect(x, y, 20, 20);
 
-        // Dessiner la ligne d'arrêt
         g.setColor(Color.WHITE);
         if(direction == Direction.HORIZONTAL) {
             g.drawLine(stopLinePosition.x, stopLinePosition.y - 2, stopLinePosition.x, stopLinePosition.y + 2);
@@ -61,11 +59,11 @@ class TrafficLight {
 
 
     public boolean isInPath(Point vehicleFront, boolean isVehicleHorizontal) {
-        // Vérifier la cohérence de direction
+
         boolean directionMatch = (this.direction == Direction.HORIZONTAL && isVehicleHorizontal)
                 || (this.direction == Direction.VERTICAL && !isVehicleHorizontal);
 
-        // Vérifier la proximité spatiale
+
         int detectionRange = 50;
         return directionMatch &&
                 Math.abs(vehicleFront.x - x) < detectionRange &&

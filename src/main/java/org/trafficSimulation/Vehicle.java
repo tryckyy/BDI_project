@@ -1,11 +1,11 @@
-package org.example;
+package org.trafficSimulation;
 
 import java.awt.*;
 import java.util.*;
 import java.util.List;
 
 
-class Vehicle {
+public class Vehicle {
     // Constantes de comportement
     private static final double SAFE_FOLLOW_DISTANCE = 120.0;
     private static final int MAX_SPEED = 5;
@@ -21,7 +21,6 @@ class Vehicle {
     private int laneChangesCount = 0;
 
     public Road currentRoad;
-
     private int position;
     private boolean reachedDestination = false;
 
@@ -78,7 +77,6 @@ class Vehicle {
     }
 
     private void perceiveEnvironment() {
-        beliefs.put("nearbyVehicles", environment.getNearbyVehicles(this));
         beliefs.put("nextTrafficLight", environment.getNextTrafficLight(this));
         beliefs.put("frontVehicle", environment.getVehiclesInLane(this).stream()
                 .filter(this::isAheadOf)
@@ -129,7 +127,8 @@ class Vehicle {
                     desires.add("fullStop");
                 }
                 else if(distance > SAFE_FOLLOW_DISTANCE) {
-                    desires.add("decelerate");                }
+                    desires.add("decelerate");
+                }
             } else {
                 if(distance < STOP_DISTANCE) {
                     desires.add("fullStop");
@@ -150,7 +149,6 @@ class Vehicle {
 
 
             if (lightState == TrafficLight.State.RED || lightState == TrafficLight.State.ORANGE) {
-                desires.remove("overtake");
 
                 if (isApproaching || isAtLight) {
                     if (lightState == TrafficLight.State.RED) {
@@ -211,8 +209,6 @@ class Vehicle {
 
         }
     }
-
-
 
 
     private void executeIntention() {
@@ -337,24 +333,6 @@ class Vehicle {
                 g.fillRect(pos.x - 5, pos.y - 10, 10, 20);
             }
         }
-        int textOffsetX = 15;
-        int textOffsetY = -5;
-
-        if (isHorizontal) {
-            if (currentRoad.isReverse()) {
-                textOffsetX = 30; // À gauche si segment inversé
-            }
-        } else {
-            textOffsetY = 15; // En dessous pour les segments verticaux
-            if (currentRoad.isReverse()) {
-                textOffsetY = 100; // Au-dessus si segment inversé
-            }
-        }
-
-        // Affichage des métriques ajusté
-        g.setColor(Color.BLACK);
-        String metrics = String.format("C: %d | T: %.1fs", laneChangesCount, getTravelTime() / 1000.0);
-        g.drawString(metrics, pos.x + textOffsetX, pos.y + textOffsetY);
 
     }
 }

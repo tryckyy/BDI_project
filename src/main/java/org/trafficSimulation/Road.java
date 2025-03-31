@@ -1,4 +1,4 @@
-package org.example;
+package org.trafficSimulation;
 
 import java.awt.*;
 import java.util.*;
@@ -46,7 +46,7 @@ public class Road {
 
     public Road(int startX, int startY, int length, Color color, boolean horizontal, boolean isRightLane) {
         this.segments = new ArrayList<>();
-        segments.add(new RoadSegment(startX, startY, length, horizontal, reverse));
+        segments.add(new RoadSegment(startX, startY, length, horizontal, false));
         this.color = color;
         this.isRightLane = isRightLane;
         connectSegments();

@@ -1,4 +1,4 @@
-package org.example;
+package org.trafficSimulation;
 
 import javax.swing.*;
 import javax.swing.Timer;
@@ -14,11 +14,11 @@ class SimulationPanel extends JPanel {
     private enum Phase { HORIZONTAL_GREEN, HORIZONTAL_ORANGE, ALL_RED, VERTICAL_GREEN, VERTICAL_ORANGE }
     private Phase currentPhase = Phase.HORIZONTAL_GREEN;
     private int phaseTimer = 0;
-    private static final int GREEN_DURATION = 200; // Adjust as needed
+    private static final int GREEN_DURATION = 200;
     private static final int ORANGE_DURATION = 50;
     private static final int ALL_RED_DURATION = 30;
-    private final Map<Vehicle, Long> travelTimes = new HashMap<>(); // Temps de trajet par véhicule
-    private final Map<Vehicle, Integer> laneChanges = new HashMap<>(); // Changements de voie par véhicule
+    private final Map<Vehicle, Long> travelTimes = new HashMap<>();
+    private final Map<Vehicle, Integer> laneChanges = new HashMap<>();
 
     public SimulationPanel() {
         initializeComponents();
@@ -26,30 +26,23 @@ class SimulationPanel extends JPanel {
 
 
     private void initializeComponents() {
-        // Création des routes
+        // Création des routes principales
         Road horizontalRoadLeft = new Road(0, 300, 700, Color.GRAY, true, false);
         Road horizontalRoadRight = new Road(0, 320, 700, Color.DARK_GRAY, true, true);
         Road verticalRoadRight = new Road(390, 0, 500, Color.GRAY, false, true);
         Road verticalRoadLeft = new Road(410, 0, 500, Color.DARK_GRAY, false, false);
 
 
-        // Virage a gauche sur la route horizontal
+        // Création des virages
         List<RoadSegment> horizontalLeftTurn = new ArrayList<>();
         horizontalLeftTurn.add(new RoadSegment(700, 200, 100, false, true));
         Road horizontalLeftTurnRoad = new Road(horizontalLeftTurn, Color.GRAY, true, false);
 
-        // Virage a gauche sur la route vertical
+
         List<RoadSegment> verticalLeftTurn = new ArrayList<>();
         verticalLeftTurn.add(new RoadSegment(410, 500, 100, true, false));
         Road verticalLeftTurnRoad = new Road(verticalLeftTurn, Color.DARK_GRAY, false, false);
 
-
-        Road afterHorizontalLeftTurn = new Road(700, 200, 200, Color.GRAY, true, false);
-        Road afterVerticalRightTurn = new Road(290, 500, 200, Color.GRAY, false, true);
-        Road afterHorizontalRightTurn = new Road(700, 420, 200, Color.DARK_GRAY, true, true);
-        Road afterVerticalLeftTurn = new Road(510, 500, 200, Color.DARK_GRAY, false, false);
-
-        // Virage a droite sur la route horizontal
         List<RoadSegment> horizontalRightTurn = new ArrayList<>();
         horizontalRightTurn.add(new RoadSegment(700, 320, 100, false, false));
         Road horizontalRightTurnRoad = new Road(horizontalRightTurn, Color.DARK_GRAY, false, true);
@@ -58,15 +51,22 @@ class SimulationPanel extends JPanel {
         verticalRightTurn.add(new RoadSegment(290, 500, 100, true, true));
         Road verticalRightTurnRoad = new Road(verticalRightTurn, Color.GRAY, true, true);
 
+        // Créations des routes apres les virages
+        Road afterHorizontalLeftTurn = new Road(700, 200, 200, Color.GRAY, true, false);
+        Road afterVerticalRightTurn = new Road(290, 500, 200, Color.GRAY, false, true);
+        Road afterHorizontalRightTurn = new Road(700, 420, 200, Color.DARK_GRAY, true, true);
+        Road afterVerticalLeftTurn = new Road(510, 500, 200, Color.DARK_GRAY, false, false);
+
+        // Connexion des routes
         horizontalRoadLeft.addNextRoad(horizontalLeftTurnRoad);
         horizontalLeftTurnRoad.addNextRoad(afterHorizontalLeftTurn);
         afterHorizontalLeftTurn.addNextRoad(horizontalRoadLeft);
-        // Connexion virage a droite route vertical
+
         verticalRoadRight.addNextRoad(verticalRightTurnRoad);
         verticalRightTurnRoad.addNextRoad(afterVerticalRightTurn);
         afterVerticalRightTurn.addNextRoad(verticalRoadRight);
 
-        // Connexion virage a droite route horizontal
+
         horizontalRoadRight.addNextRoad(horizontalRightTurnRoad);
         horizontalRightTurnRoad.addNextRoad(afterHorizontalRightTurn);
         afterHorizontalRightTurn.addNextRoad(horizontalRoadRight);
@@ -75,14 +75,13 @@ class SimulationPanel extends JPanel {
         verticalLeftTurnRoad.addNextRoad(afterVerticalLeftTurn);
         afterVerticalLeftTurn.addNextRoad(verticalRoadLeft);
 
+        // Appairer les routes adjacentes
         verticalRoadRight.setPairedRoad(verticalRoadLeft);
         verticalRoadLeft.setPairedRoad(verticalRoadRight);
         horizontalRoadRight.setPairedRoad(horizontalRoadLeft);
         horizontalRoadLeft.setPairedRoad(horizontalRoadRight);
 
 
-
-        // Ajouter toutes les routes à la liste
         roads.addAll(List.of(
                 horizontalRoadRight, horizontalRoadLeft,
                 verticalRoadRight, verticalRoadLeft,
@@ -99,14 +98,14 @@ class SimulationPanel extends JPanel {
         );
 
 
-        int carsPerLane = 3; // 3 voitures par voie
-        int spawnDelay = 10000; // Délai de 2 secondes
+        int carsPerLane = 6;
+        int spawnDelay = 10000;
 
         mainRoads.forEach(road -> {
-            // Première voiture immédiate
+
             createAndAddVehicle(road);
 
-            // Ajout des voitures suivantes avec délai
+
             for (int i = 1; i < carsPerLane; i++) {
                 Timer timer = new Timer(i * spawnDelay, e -> createAndAddVehicle(road));
                 timer.setRepeats(false);
@@ -117,9 +116,8 @@ class SimulationPanel extends JPanel {
 
         int offset = 50;
 
-        // Feux verticaux (Nord/Sud) placés avant l'intersection
         trafficLights.add(new TrafficLight(
-                370, 300 - offset, // Nord sur route verticale gauche
+                370, 300 - offset,
                 TrafficLight.Direction.VERTICAL,
                 TrafficLight.State.RED
         ));
@@ -133,16 +131,16 @@ class SimulationPanel extends JPanel {
 
 
 
-        // Feux horizontaux (Est/Ouest) placés avant l'intersection
+
         trafficLights.add(new TrafficLight(
-                400 - offset, 280, // Ouest sur route horizontale haute
+                400 - offset, 280,
                 TrafficLight.Direction.HORIZONTAL,
                 TrafficLight.State.GREEN
         ));
 
-        // Feux horizontaux (Est/Ouest) placés avant l'intersection
+
         trafficLights.add(new TrafficLight(
-                400 - offset, 340, // Ouest sur route horizontale haute
+                400 - offset, 340,
                 TrafficLight.Direction.HORIZONTAL,
                 TrafficLight.State.GREEN
         ));
@@ -171,7 +169,7 @@ class SimulationPanel extends JPanel {
             Road destination = possibleDestinations.get(
                     new Random().nextInt(possibleDestinations.size())
             );
-            Vehicle v = new Vehicle(road, 0, 2, this, destination); // Position de départ à 0
+            Vehicle v = new Vehicle(road, 0, 2, this, destination);
             vehicles.add(v);
         }
     }
@@ -203,7 +201,7 @@ class SimulationPanel extends JPanel {
     public List<Vehicle> getVehiclesOnRoad(Road road) {
         return Collections.unmodifiableList(
                 vehicles.stream()
-                        .filter(v -> v.currentRoad.equals(road)) // Utilisez equals() si les routes ont une identité logique
+                        .filter(v -> v.currentRoad.equals(road))
                         .collect(Collectors.toList())
         );
     }
@@ -272,7 +270,6 @@ class SimulationPanel extends JPanel {
         super.paintComponent(g);
         setBackground(Color.WHITE);
 
-        // Dessin des éléments
         roads.forEach(r -> r.draw(g));
         trafficLights.forEach(t -> t.draw(g));
         vehicles.forEach(v -> v.draw(g));
@@ -296,13 +293,6 @@ class SimulationPanel extends JPanel {
 
     }
 
-    public List<Vehicle> getNearbyVehicles(Vehicle requester) {
-        Point requesterPos = requester.getPosition();
-        return vehicles.stream()
-                .filter(v -> v != requester)
-                .filter(v -> v.getPosition().distance(requesterPos) < 50)
-                .collect(Collectors.toList());
-    }
 
     public List<Vehicle> getVehiclesInLane(Vehicle requester) {
         return vehicles.stream()
@@ -315,11 +305,10 @@ class SimulationPanel extends JPanel {
 
     public Optional<TrafficLight> getNextTrafficLight(Vehicle vehicle) {
         return trafficLights.stream()
-                // Filtrer les feux pertinents pour le véhicule
+
                 .filter(light ->
                         light.isInPath(vehicle.getFrontPosition(), vehicle.currentRoad.isHorizontal())
                 )
-                // Trier par distance croissante
                 .min(Comparator.comparingDouble(light ->
                         vehicle.getPosition().distance(light.getPosition())
                 ));
