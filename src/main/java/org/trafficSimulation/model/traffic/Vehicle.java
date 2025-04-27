@@ -1,5 +1,9 @@
-package org.trafficSimulation;
+package org.trafficSimulation.model.traffic;
 
+import org.trafficSimulation.model.graph.RoadGraph;
+import org.trafficSimulation.model.road.Road;
+import org.trafficSimulation.model.road.RoadSegment;
+import org.trafficSimulation.view.SimulationPanel;
 import java.awt.*;
 import java.util.*;
 import java.util.List;
@@ -9,10 +13,10 @@ public class Vehicle {
     // Constantes de comportement
     private static final double SAFE_FOLLOW_DISTANCE = 120.0;
     private static final int MAX_SPEED = 5;
-    private static final double STOP_DISTANCE = 60.0;
+    private static final double STOP_DISTANCE = 50;
     private static final int LANE_WIDTH = 20;
-    public static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 70;
     private long lastLaneChangeTime = 0;
+    private static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 60;
     private static final long LANE_CHANGE_COOLDOWN = 1000;
 
     private final Road destination;
@@ -123,14 +127,6 @@ public class Vehicle {
             return false; // Ne pas changer de voie si c'est la dernière route
         }
 
-        // Ne changer de voie que si on est proche de la fin de la route actuelle
-        boolean isNearEnd = currentRoad.isReverse()
-                ? position <= MIN_SAFE_LANE_CHANGE_DISTANCE
-                : position >= currentRoad.getLength() - MIN_SAFE_LANE_CHANGE_DISTANCE;
-
-        if (!isNearEnd) {
-            return false;
-        }
 
         Road nextRoad = path.get(currentIndex + 1);
         return nextRoad.isRightLane() != currentRoad.isRightLane();
@@ -138,49 +134,17 @@ public class Vehicle {
 
 
 
-    private void handleTrafficAndObstacles() {
-        Optional<Vehicle> frontVehicle = (Optional<Vehicle>) beliefs.get("frontVehicle");
-        Optional<TrafficLight> lightOpt = (Optional<TrafficLight>) beliefs.get("nextTrafficLight");
-
-
-        // Gestion des véhicules devant
-        frontVehicle.ifPresent(v -> {
-            double distance = distanceTo(v);
-            if (distance < STOP_DISTANCE) {
-                desires.add("fullStop");
-            } else if (distance < SAFE_FOLLOW_DISTANCE) {
-                desires.add("decelerate");
-            }
-        });
-
-        // Gestion des feux
-        lightOpt.ifPresent(light -> {
-            TrafficLight.State lightState = light.getState();
-            double distance = getDistanceToLight(light);
-
-            if ((lightState == TrafficLight.State.RED || lightState == TrafficLight.State.ORANGE) &&
-                    isApproachingLight(light)) {
-                if (distance < STOP_DISTANCE) {
-                    desires.add("fullStop");
-                } else if (distance < SAFE_FOLLOW_DISTANCE) {
-                    desires.add("decelerate");
-                }
-            }
-        });
-    }
-
 
 
 
     private void evaluateDesires() {
         desires.clear();
-        handleTrafficAndObstacles();
 
         if(!beliefs.containsKey("changeLane")) {
             desires.add("accelerate");
         }
 
-        if(beliefs.containsKey("changeLane")) {
+        else{
             desires.add("changeLane");
         }
 
@@ -334,9 +298,6 @@ public class Vehicle {
             speed = MAX_SPEED - 1;
         }
 
-
-
-
         if(desires.contains("fullStop")) {
             speed = 0;
         }
@@ -370,34 +331,6 @@ public class Vehicle {
         }
     }
 
-
-
-
-    private void recalculatePath() {
-        Point start = getPosition();
-        Point end = RoadGraph.getEndPoint(destination);
-
-        if (currentRoad.isReverse() ? position <= 0 : position >= currentRoad.getLength()) {
-            start = RoadGraph.getEndPoint(currentRoad);
-        }
-
-        List<Road> newPath = RoadGraph.buildFromRoads(environment.roads)
-                .findShortestPath(start, end);
-
-        if (!newPath.isEmpty()) {
-            this.path = newPath;
-            Road firstRoad = path.get(0);
-            Road pairedRoad = currentRoad.getPairedRoad();
-
-            if (!firstRoad.equals(currentRoad) && pairedRoad != null && firstRoad.equals(pairedRoad)) {
-                currentRoad = firstRoad;
-                position = currentRoad.isReverse() ? currentRoad.getLength() : 0;
-                isInRightLane = currentRoad.isRightLane();
-            }
-        } else {
-            reachedDestination = true;
-        }
-    }
 
 
     private boolean isAheadOf(Vehicle other) {

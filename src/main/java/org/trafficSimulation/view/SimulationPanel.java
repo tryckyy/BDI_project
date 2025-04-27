@@ -1,4 +1,4 @@
-package org.trafficSimulation;
+package org.trafficSimulation.view;
 
 import javax.sound.midi.SysexMessage;
 import javax.swing.*;
@@ -8,18 +8,25 @@ import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
+import org.trafficSimulation.model.ai.TrafficLightQLearning;
+import org.trafficSimulation.model.graph.RoadGraph;
+import org.trafficSimulation.model.road.Road;
+import org.trafficSimulation.model.road.RoadSegment;
+import org.trafficSimulation.model.traffic.TrafficLight;
+import org.trafficSimulation.model.traffic.Vehicle;
 
-import static org.trafficSimulation.RoadGraph.getEndPoint;
-import static org.trafficSimulation.RoadGraph.getStartPoint;
+import static org.trafficSimulation.model.graph.RoadGraph.getEndPoint;
+import static org.trafficSimulation.model.graph.RoadGraph.getStartPoint;
 
-class SimulationPanel extends JPanel {
+
+public class SimulationPanel extends JPanel {
     private List<Vehicle> vehicles = new ArrayList<>();
     private List<TrafficLight> trafficLights = new ArrayList<>();
     private List<Road> endpointRoads = new ArrayList<>();
     public List<Road> roads = new ArrayList<>();
     private TrafficLightQLearning qLearning;
     private int timeSinceLastChange = 0;
-    private TrafficLightQLearning.TrafficPhase currentTrafficPhase = TrafficLightQLearning.TrafficPhase.HORIZONTAL_GREEN;
+    private TrafficLightQLearning.TrafficPhase currentTrafficPhase = TrafficLightQLearning.TrafficPhase.HORIZONTAL_GREEN;;
     private final Map<Vehicle, Long> travelTimes = new HashMap<>();
     private final Map<Vehicle, Integer> laneChanges = new HashMap<>();
     private static final double CONNECTION_THRESHOLD = 10;
@@ -57,19 +64,6 @@ class SimulationPanel extends JPanel {
         });
         add(showDestinationsCheckbox);
 
-        JButton validateButton = new JButton("Vérifier les chemins");
-        validateButton.setBounds(10, 190, 200, 30);
-        validateButton.addActionListener(e -> {
-            Map<Road, Map<Road, List<Road>>> results = validateAllPaths();
-            int validPaths = results.values().stream().mapToInt(Map::size).sum();
-            JOptionPane.showMessageDialog(this,
-                    "Vérification terminée!\n" +
-                            "Routes analysées: " + roads.size() + "\n" +
-                            "Destinations possibles: " + endpointRoads.size() + "\n" +
-                            "Chemins valides trouvés: " + validPaths);
-            repaint();
-        });
-        add(validateButton);
 
 
 
@@ -193,8 +187,8 @@ class SimulationPanel extends JPanel {
         // Création des routes principales
         Road horizontalRoadLeft = new Road(0, 300, 700, Color.GRAY, true, false);
         Road horizontalRoadRight = new Road(0, 320, 700, Color.DARK_GRAY, true, true);
-        Road verticalRoadRight = new Road(390, 0, 500, Color.GRAY, false, true);
-        Road verticalRoadLeft = new Road(410, 0, 500, Color.DARK_GRAY, false, false);
+        Road verticalRoadRight = new Road(390, 0, 600, Color.GRAY, false, true);
+        Road verticalRoadLeft = new Road(410, 0, 600, Color.DARK_GRAY, false, false);
 
 
         // Création des virages
@@ -204,7 +198,7 @@ class SimulationPanel extends JPanel {
 
 
         List<RoadSegment> verticalLeftTurn = new ArrayList<>();
-        verticalLeftTurn.add(new RoadSegment(410, 500, 100, true, false));
+        verticalLeftTurn.add(new RoadSegment(410, 600, 100, true, false));
         Road verticalLeftTurnRoad = new Road(verticalLeftTurn, Color.DARK_GRAY, false, false);
 
         List<RoadSegment> horizontalRightTurn = new ArrayList<>();
@@ -212,28 +206,28 @@ class SimulationPanel extends JPanel {
         Road horizontalRightTurnRoad = new Road(horizontalRightTurn, Color.DARK_GRAY, false, true);
 
         List<RoadSegment> verticalRightTurn = new ArrayList<>();
-        verticalRightTurn.add(new RoadSegment(290, 500, 100, true, true));
+        verticalRightTurn.add(new RoadSegment(290, 600, 100, true, true));
         Road verticalRightTurnRoad = new Road(verticalRightTurn, Color.GRAY, true, true);
 
         // Créations des routes apres les virages
         Road afterHorizontalLeftTurn = new Road(700, 200, 400, Color.GRAY, true, false);
-        Road afterVerticalRightTurn = new Road(290, 500, 300, Color.GRAY, false, true);
+        Road afterVerticalRightTurn = new Road(290, 600, 300, Color.GRAY, false, true);
         Road afterHorizontalRightTurn = new Road(700, 420, 400, Color.DARK_GRAY, true, true);
-        Road afterVerticalLeftTurn = new Road(510, 500, 300, Color.DARK_GRAY, false, false);
+        Road afterVerticalLeftTurn = new Road(510, 600, 300, Color.DARK_GRAY, false, false);
 
 
         List<RoadSegment> verticalLeftTurn2 = new ArrayList<>();
-        verticalLeftTurn2.add(new RoadSegment(290, 800, 100, true, false));
+        verticalLeftTurn2.add(new RoadSegment(290, 900, 100, true, false));
         Road verticalLeftTurnRoad2 = new Road(verticalLeftTurn2, Color.GRAY, false, false);
 
         List<RoadSegment> verticalRightTurn3 = new ArrayList<>();
-        verticalRightTurn3.add(new RoadSegment(410, 800, 100, true, true));
+        verticalRightTurn3.add(new RoadSegment(410, 900, 100, true, true));
         Road verticalRightTurnRoad3 = new Road(verticalRightTurn3, Color.DARK_GRAY, true, true);
 
-        Road horizontalRoad2 = new Road(400, 800, 100, Color.DARK_GRAY, false, false);
+        Road horizontalRoad2 = new Road(400, 900, 50, Color.DARK_GRAY, false, false);
 
         List<RoadSegment> verticalLeftTurn3 = new ArrayList<>();
-        verticalLeftTurn3.add(new RoadSegment(500, 800, 200, true, false));
+        verticalLeftTurn3.add(new RoadSegment(500, 900, 200, true, false));
         Road verticalLeftTurnRoad3 = new Road(verticalLeftTurn3, Color.DARK_GRAY, false, false);
 
 
@@ -247,7 +241,7 @@ class SimulationPanel extends JPanel {
         Road horizontalRightTurnRoad3 = new Road(horizontalRightTurn3, Color.GRAY, false, false);
 
         List<RoadSegment> horizontalRightTurn4 = new ArrayList<>();
-        horizontalRightTurn4.add(new RoadSegment(1100, 420, 100, false, false));
+        horizontalRightTurn4.add(new RoadSegment(1100, 410, 100, false, false));
         Road horizontalRightTurnRoad4 = new Road(horizontalRightTurn4, Color.DARK_GRAY, false, true);
 
         List<RoadSegment> horizontalLeftTurn4 = new ArrayList<>();
@@ -255,18 +249,29 @@ class SimulationPanel extends JPanel {
         Road horizontalLeftTurnRoad4 = new Road(horizontalLeftTurn4, Color.GRAY, true, false);
 
         List<RoadSegment> verticalRightTurn4 = new ArrayList<>();
-        verticalRightTurn4.add(new RoadSegment(190, 800, 100, true, true));
+        verticalRightTurn4.add(new RoadSegment(190, 900, 100, true, true));
         Road verticalRightTurnRoad4 = new Road(verticalRightTurn4, Color.GRAY, true, true);
 
-        Road horizontalRoad4 = new Road(1100, 310, 100, Color.GRAY, true, false);
+        Road horizontalRoad4 = new Road(1100, 310, 200, Color.GRAY, true, false);
 
+        List<RoadSegment> horizontalLeftTurn5 = new ArrayList<>();
+        horizontalLeftTurn5.add(new RoadSegment(1300, 210, 100, false, true));
+        Road horizontalLeftTurnRoad5 = new Road(horizontalLeftTurn5, Color.GRAY, true, false);
 
+        List<RoadSegment> horizontalRightTurn5 = new ArrayList<>();
+        horizontalRightTurn5.add(new RoadSegment(1450, 330, 150, false, false));
+        Road horizontalRightTurnRoad5 = new Road(horizontalRightTurn5, Color.DARK_GRAY, false, true);
+
+        Road horizontalRoad5 = new Road(1100, 330, 350, Color.DARK_GRAY, true, true);
 
         // Appairer les routes adjacentes
         verticalRoadRight.setPairedRoad(verticalRoadLeft);
         verticalRoadLeft.setPairedRoad(verticalRoadRight);
         horizontalRoadRight.setPairedRoad(horizontalRoadLeft);
         horizontalRoadLeft.setPairedRoad(horizontalRoadRight);
+
+        horizontalRoad4.setPairedRoad(horizontalRoad5);
+        horizontalRoad5.setPairedRoad(horizontalRoad4);
 
 
         roads.addAll(List.of(
@@ -276,7 +281,8 @@ class SimulationPanel extends JPanel {
                 verticalRightTurnRoad, afterVerticalRightTurn, afterVerticalLeftTurn, afterHorizontalRightTurn,
                 verticalLeftTurnRoad, verticalLeftTurnRoad2, verticalRightTurnRoad3, horizontalRoad2,
                 verticalLeftTurnRoad3, horizontalRightTurnRoad3,horizontalLeftTurnRoad3,
-                horizontalRoad4, horizontalRightTurnRoad4, horizontalLeftTurnRoad4, verticalRightTurnRoad4
+                horizontalRoad4, horizontalRightTurnRoad4, horizontalLeftTurnRoad4, verticalRightTurnRoad4,
+                horizontalRoad5, horizontalLeftTurnRoad5, horizontalRightTurnRoad5
         ));
 
 
@@ -293,9 +299,9 @@ class SimulationPanel extends JPanel {
         identifyTrueEndpoints();
         generateDijkstraGraph();
 
-        
 
-        int carsPerLane = 1;
+
+        int carsPerLane = 8;
         int spawnDelay = 5000;
 
         mainRoads.forEach(road -> {
@@ -307,11 +313,6 @@ class SimulationPanel extends JPanel {
                 timer.start();
             }
         });
-
-
-
-
-
 
         int offset = 50;
 
@@ -408,7 +409,6 @@ class SimulationPanel extends JPanel {
                 .filter(road -> road.getNextRoads().isEmpty())
                 .collect(Collectors.toList());
 
-        System.out.println("Endpoint roads: " + endpointRoads);
     }
 
 
@@ -421,7 +421,7 @@ class SimulationPanel extends JPanel {
         List<Road> possibleDestinations = new ArrayList<>();
 
         for (Road road : endpointRoads) {
-                    possibleDestinations.add(road);
+            possibleDestinations.add(road);
         }
 
 
@@ -481,10 +481,10 @@ class SimulationPanel extends JPanel {
         vehicles.removeAll(arrived);
 
         arrived.forEach(v -> {
-                travelTimes.put(v, v.getTravelTime() );
-                laneChanges.put(v, v.getLaneChangesCount());
-        }
-                );
+                    travelTimes.put(v, v.getTravelTime() );
+                    laneChanges.put(v, v.getLaneChangesCount());
+                }
+        );
 
         vehicles.removeAll(arrived);
 
@@ -518,7 +518,7 @@ class SimulationPanel extends JPanel {
         TrafficLightQLearning.Action action = qLearning.chooseAction();
 
         // Exécuter l'action
-        TrafficLightQLearning.TrafficPhase newPhase = qLearning.executeAction(currentTrafficPhase, timeSinceLastChange);
+        TrafficLightQLearning.TrafficPhase newPhase = qLearning.executeAction(action,currentTrafficPhase, timeSinceLastChange);
 
         // Si la phase a changé
         if (newPhase != currentTrafficPhase) {

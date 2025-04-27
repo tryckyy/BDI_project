@@ -1,6 +1,7 @@
-package org.trafficSimulation;
+package org.trafficSimulation.controller;
 
 import javax.swing.*;
+import org.trafficSimulation.view.SimulationPanel;
 
 public class TrafficSimulator extends JFrame {
     private SimulationPanel simulationPanel;

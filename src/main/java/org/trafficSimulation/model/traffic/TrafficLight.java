@@ -1,18 +1,18 @@
-package org.trafficSimulation;
+package org.trafficSimulation.model.traffic;
 
 import java.awt.*;
 
-class TrafficLight {
-    enum State { RED, GREEN, ORANGE }
-    enum Direction { HORIZONTAL, VERTICAL }
+public class TrafficLight {
+    public enum State { RED, GREEN, ORANGE }
+    public enum Direction { HORIZONTAL, VERTICAL }
 
     private int x;
     private int y;
-    private final Direction direction;
-    private final Point stopLinePosition;
+    public final Direction direction;
+    public final Point stopLinePosition;
     private State state;
 
-    Point getPosition() {
+    public Point getPosition() {
         return new Point (x, y);
     }
 

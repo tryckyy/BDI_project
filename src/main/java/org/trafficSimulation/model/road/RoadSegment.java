@@ -1,4 +1,4 @@
-package org.trafficSimulation;
+package org.trafficSimulation.model.road;
 
 import java.awt.*;
 

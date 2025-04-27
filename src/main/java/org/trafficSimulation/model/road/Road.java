@@ -1,4 +1,5 @@
-package org.trafficSimulation;
+package org.trafficSimulation.model.road;
+
 
 import java.awt.*;
 import java.util.*;
@@ -39,13 +40,6 @@ public class Road {
         return Collections.unmodifiableList(segments);
     }
 
-    public RoadSegment getFirstSegment() {
-        return segments.isEmpty() ? null : segments.get(0);
-    }
-
-    public RoadSegment getLastSegment() {
-        return segments.isEmpty() ? null : segments.get(segments.size() - 1);
-    }
 
     public List<Road> getNextRoads() {
         return Collections.unmodifiableList(nextRoads);
@@ -74,15 +68,6 @@ public class Road {
         this.isRightLane = isRightLane;
         connectSegments();
     }
-
-
-
-    public boolean isEndRoad() {
-        // Une route est une fin de route si elle n'a pas de connexions vers d'autres routes
-        return nextRoads.isEmpty();
-    }
-
-
 
 
     private void connectSegments() {
