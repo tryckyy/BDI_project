@@ -12,9 +12,12 @@ public class Vehicle {
     private static final double STOP_DISTANCE = 60.0;
     private static final int LANE_WIDTH = 20;
     public static final int MIN_SAFE_LANE_CHANGE_DISTANCE = 70;
+    private long lastLaneChangeTime = 0;
+    private static final long LANE_CHANGE_COOLDOWN = 1000;
+
     private final Road destination;
     private final int baseSpeed = 2;
-    private int laneChangeCooldown = 0;
+
     private Color color;
     private final SimulationPanel environment;
     private final long creationTime = System.currentTimeMillis(); // Temps de création
@@ -23,6 +26,8 @@ public class Vehicle {
     public Road currentRoad;
     private int position;
     private boolean reachedDestination = false;
+
+    private List<Road> path;
 
     private int speed;
     private boolean isInRightLane;
@@ -46,22 +51,32 @@ public class Vehicle {
                 (int)(Math.random() * 200 + 55)
         );
         this.isInRightLane = currentRoad.isRightLane();
+
     }
+
+    public void setPath(List<Road> path) {
+        this.path = new ArrayList<>(path);
+        // Ajouter la destination comme dernière étape si elle n'y est pas
+        if (!path.isEmpty() && !path.get(path.size() - 1).equals(destination)) {
+            this.path.add(destination);
+        }
+    }
+
+
 
     public boolean hasReachedDestination() {
         return reachedDestination;
     }
 
     private void checkDestination() {
-        if (currentRoad == destination) {
-            if (currentRoad.isReverse()) {
-                if (position <= 0) { // Fin de route en mode reverse
-                    reachedDestination = true;
-                }
-            } else {
-                if (position >= currentRoad.getLength()) { // Fin de route normale
-                    reachedDestination = true;
-                }
+        // ONLY check if on the final destination road and at its end point
+        if (currentRoad.equals(destination)) {
+            boolean atEndOfRoad = currentRoad.isReverse()
+                    ? position <= 0
+                    : position >= currentRoad.getLength();
+
+            if (atEndOfRoad) {
+                reachedDestination = true;
             }
         }
     }
@@ -73,7 +88,6 @@ public class Vehicle {
         executeIntention();
         move();
         checkDestination();
-        if (laneChangeCooldown > 0) laneChangeCooldown--;
     }
 
     private void perceiveEnvironment() {
@@ -82,41 +96,94 @@ public class Vehicle {
                 .filter(this::isAheadOf)
                 .min(Comparator.comparingDouble(this::distanceTo)));
 
-        if(destination.isRightLane() && !currentRoad.isRightLane()) {
-            beliefs.put("shouldChangeLane", true);
-            isInRightLane = true;
-        }
-        else if(!destination.isRightLane() && currentRoad.isRightLane()) {
-            beliefs.put("shouldChangeLane", true);
-            isInRightLane = false;
+        if(shouldPrepareForDestinationLane()) {
+            beliefs.put("changeLane", true);
         }
         else {
-            beliefs.remove("shouldChangeLane");
+            beliefs.remove("changeLane");
         }
+
+
     }
+
+    private boolean shouldPrepareForDestinationLane() {
+        if (path == null || path.size() < 2) {
+            return false;
+        }
+
+        int currentIndex = path.indexOf(currentRoad);
+        if (currentIndex < 0) {
+            // Si la route actuelle n'est pas dans le chemin, vérifier la première route du chemin
+            Road firstRoadInPath = path.get(0);
+            Road pairedRoad = currentRoad.getPairedRoad();
+            return pairedRoad != null && firstRoadInPath.equals(pairedRoad);
+        }
+
+        if (currentIndex == path.size() - 1) {
+            return false; // Ne pas changer de voie si c'est la dernière route
+        }
+
+        // Ne changer de voie que si on est proche de la fin de la route actuelle
+        boolean isNearEnd = currentRoad.isReverse()
+                ? position <= MIN_SAFE_LANE_CHANGE_DISTANCE
+                : position >= currentRoad.getLength() - MIN_SAFE_LANE_CHANGE_DISTANCE;
+
+        if (!isNearEnd) {
+            return false;
+        }
+
+        Road nextRoad = path.get(currentIndex + 1);
+        return nextRoad.isRightLane() != currentRoad.isRightLane();
+    }
+
+
+
+    private void handleTrafficAndObstacles() {
+        Optional<Vehicle> frontVehicle = (Optional<Vehicle>) beliefs.get("frontVehicle");
+        Optional<TrafficLight> lightOpt = (Optional<TrafficLight>) beliefs.get("nextTrafficLight");
+
+
+        // Gestion des véhicules devant
+        frontVehicle.ifPresent(v -> {
+            double distance = distanceTo(v);
+            if (distance < STOP_DISTANCE) {
+                desires.add("fullStop");
+            } else if (distance < SAFE_FOLLOW_DISTANCE) {
+                desires.add("decelerate");
+            }
+        });
+
+        // Gestion des feux
+        lightOpt.ifPresent(light -> {
+            TrafficLight.State lightState = light.getState();
+            double distance = getDistanceToLight(light);
+
+            if ((lightState == TrafficLight.State.RED || lightState == TrafficLight.State.ORANGE) &&
+                    isApproachingLight(light)) {
+                if (distance < STOP_DISTANCE) {
+                    desires.add("fullStop");
+                } else if (distance < SAFE_FOLLOW_DISTANCE) {
+                    desires.add("decelerate");
+                }
+            }
+        });
+    }
+
+
 
 
     private void evaluateDesires() {
         desires.clear();
+        handleTrafficAndObstacles();
 
-        if (beliefs.containsKey("shouldChangeLane") && !isInRightLane && !isAdjacentLaneClear()) {
-            desires.add("decelerate");
+        if(!beliefs.containsKey("changeLane")) {
+            desires.add("accelerate");
         }
-        else if(beliefs.containsKey("shouldChangeLane") && !isInRightLane && isAdjacentLaneClear()) {
+
+        if(beliefs.containsKey("changeLane")) {
             desires.add("changeLane");
         }
-        else if(beliefs.containsKey("shouldChangeLane") && isInRightLane && !isAdjacentLaneClear()) {
-            desires.add("accelerate");
-        }
-        else if(beliefs.containsKey("shouldChangeLane") && isInRightLane && isAdjacentLaneClear()) {
-            desires.add("changeLane");
-        }
-        else if(!beliefs.containsKey("shouldChangeLane") && !isInRightLane) {
-            desires.add("accelerate");
-        }
-        else if(!beliefs.containsKey("shouldChangeLane") && isInRightLane) {
-            desires.add("accelerate");
-        }
+
 
         Optional<Vehicle> frontVehicle = (Optional<Vehicle>) beliefs.get("frontVehicle");
         frontVehicle.ifPresent(v -> {
@@ -183,11 +250,34 @@ public class Vehicle {
 
     private boolean isAdjacentLaneClear() {
         Road paired = currentRoad.getPairedRoad();
-        if(paired == null) return false;
+        if (paired == null) return false;
+
         List<Vehicle> adjacentVehicles = environment.getVehiclesOnRoad(paired);
-        return adjacentVehicles.stream().noneMatch(v ->
-                Math.abs(v.position - this.position) < MIN_SAFE_LANE_CHANGE_DISTANCE
-        );
+
+        // Vérifiez si la route est dans le même sens ou dans le sens inverse
+        boolean isSameDirection = paired.isReverse() == currentRoad.isReverse();
+
+        for (Vehicle v : adjacentVehicles) {
+            int relativePosInAdjacentLane;
+
+            // Ajustez la position relative en fonction de l'orientation des routes
+            if (isSameDirection) {
+                relativePosInAdjacentLane = v.position;
+            } else {
+                // Si les routes sont dans des directions opposées, inversez la position relative
+                relativePosInAdjacentLane = paired.getLength() - v.position;
+            }
+
+            // Calculez la distance entre les véhicules en tenant compte de la direction
+            int positionDifference = Math.abs(relativePosInAdjacentLane - this.position);
+
+            // Vérifiez si la distance est inférieure à la distance minimale sécuritaire
+            if (positionDifference < MIN_SAFE_LANE_CHANGE_DISTANCE) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     public int getLaneChangesCount() { return laneChangesCount; }
@@ -197,39 +287,54 @@ public class Vehicle {
     }
 
     void changeLane() {
-        Road pairedRoad = currentRoad.getPairedRoad();
-        if (pairedRoad == null) return;
-
-
-        if (isAdjacentLaneClear()) {
-            currentRoad = pairedRoad;
-            isInRightLane = currentRoad.isRightLane();
-            laneOffset = currentRoad.isHorizontal() ? LANE_WIDTH / 8 : -LANE_WIDTH / 8;
-            laneChangesCount++;
-
+        long currentTime = System.currentTimeMillis();
+        if (currentTime - lastLaneChangeTime < LANE_CHANGE_COOLDOWN) {
+            return; // Ignore le changement si le cooldown n'est pas écoulé
         }
+
+        Road pairedRoad = currentRoad.getPairedRoad();
+        if (pairedRoad == null || !isAdjacentLaneClear()) {
+            return;
+        }
+
+        currentRoad = pairedRoad;
+        isInRightLane = currentRoad.isRightLane();
+        laneOffset = currentRoad.isHorizontal() ? LANE_WIDTH / 8 : -LANE_WIDTH / 8;
+        laneChangesCount++;
+        lastLaneChangeTime = currentTime; // Met à jour le temps du dernier changement
     }
 
 
+    public Color getColor() {
+        return color;
+    }
+
+    public Road getDestination() {
+        return destination;
+    }
+
     private void executeIntention() {
+        if (desires.contains("changeLane")) {
+            changeLane();
+            desires.add("accelerate");
+        }
         if (desires.contains("maintainSpeed")) {
             speed = baseSpeed;
         }
+
 
         else if(desires.contains("decelerate")) {
             speed = Math.max(speed - 1, 1);
         }
 
         else if(desires.contains("accelerate") && !isInRightLane) {
-            speed = MAX_SPEED;
+            speed = MAX_SPEED + 1;
         }
         else if(desires.contains("accelerate") && isInRightLane) {
             speed = MAX_SPEED - 1;
         }
 
-        else if(desires.contains("changeLane")) {
-            changeLane();
-        }
+
 
 
         if(desires.contains("fullStop")) {
@@ -239,28 +344,60 @@ public class Vehicle {
 
 
     private void move() {
+        if (reachedDestination) return;
 
-        if (currentRoad.isReverse() && position >= -currentRoad.getLength()) {
-            position -= speed;
-        } else if (position < -currentRoad.getLength()) {
-            if (!currentRoad.getNextRoads().isEmpty()) {
-                currentRoad = currentRoad.getNextRoads().get(0); // Prend la première route suivante
-                isInRightLane = currentRoad.isRightLane();
-                position = 0;
+        position += currentRoad.isReverse() ? -speed : speed;
+
+        boolean shouldTransition = currentRoad.isReverse()
+                ? position <= 0
+                : position >= currentRoad.getLength();
+
+        if (shouldTransition) {
+            if (currentRoad.equals(destination)) {
+                reachedDestination = true;
+                return;
             }
-        } else {
-            position += speed;
-            if (position > currentRoad.getLength()) {
-                if (!currentRoad.getNextRoads().isEmpty()) {
-                    currentRoad = currentRoad.getNextRoads().get(0);
-                    position = 0;
-                } else {
-                    position %= currentRoad.getLength();
-                }
+
+
+
+            int currentIndex = path.indexOf(currentRoad);
+            if (currentIndex >= 0 && currentIndex < path.size() - 1) {
+                Road nextRoad = path.get(currentIndex + 1);
+                currentRoad = nextRoad;
+                position = nextRoad.isReverse() ? nextRoad.getLength() : 0;
+                isInRightLane = nextRoad.isRightLane();
             }
         }
     }
 
+
+
+
+    private void recalculatePath() {
+        Point start = getPosition();
+        Point end = RoadGraph.getEndPoint(destination);
+
+        if (currentRoad.isReverse() ? position <= 0 : position >= currentRoad.getLength()) {
+            start = RoadGraph.getEndPoint(currentRoad);
+        }
+
+        List<Road> newPath = RoadGraph.buildFromRoads(environment.roads)
+                .findShortestPath(start, end);
+
+        if (!newPath.isEmpty()) {
+            this.path = newPath;
+            Road firstRoad = path.get(0);
+            Road pairedRoad = currentRoad.getPairedRoad();
+
+            if (!firstRoad.equals(currentRoad) && pairedRoad != null && firstRoad.equals(pairedRoad)) {
+                currentRoad = firstRoad;
+                position = currentRoad.isReverse() ? currentRoad.getLength() : 0;
+                isInRightLane = currentRoad.isRightLane();
+            }
+        } else {
+            reachedDestination = true;
+        }
+    }
 
 
     private boolean isAheadOf(Vehicle other) {
@@ -322,9 +459,9 @@ public class Vehicle {
         boolean isHorizontal = currentSegment.isHorizontal();
 
         if(currentSegment.isReverse() && !isHorizontal) {
-            g.fillRect(pos.x - 5, pos.y + currentSegment.getLength() , 10, 20);
+            g.fillRect(pos.x - 5, pos.y , 10, 20);
         } else if (currentSegment.isReverse() && isHorizontal) {
-            g.fillRect(pos.x + currentSegment.getLength(), pos.y - 5 , 20, 10);
+            g.fillRect(pos.x, pos.y - 5 , 20, 10);
         } else {
 
             if (isHorizontal) {

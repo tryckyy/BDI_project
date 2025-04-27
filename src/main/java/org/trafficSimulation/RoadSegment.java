@@ -14,6 +14,14 @@ public class RoadSegment {
     private boolean horizontal;
     private boolean reverse;
 
+    public int getY() {
+        return startY;
+    }
+
+    public int getX() {
+        return startX;
+    }
+
     public RoadSegment(int startX, int startY, int length, boolean horizontal, boolean reverse) {
         this.startX = startX;
         this.startY = startY;
