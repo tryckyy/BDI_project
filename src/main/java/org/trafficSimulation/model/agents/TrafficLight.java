@@ -1,4 +1,4 @@
-package org.trafficSimulation.model.traffic;
+package org.trafficSimulation.model.agents;
 
 import java.awt.*;
 

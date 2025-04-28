@@ -1,6 +1,5 @@
-package org.trafficSimulation.model.traffic;
+package org.trafficSimulation.model.agents;
 
-import org.trafficSimulation.model.graph.RoadGraph;
 import org.trafficSimulation.model.road.Road;
 import org.trafficSimulation.model.road.RoadSegment;
 import org.trafficSimulation.view.SimulationPanel;
@@ -12,7 +11,10 @@ import java.util.List;
 public class Vehicle {
     // Constantes de comportement
     private static final double SAFE_FOLLOW_DISTANCE = 120.0;
-    private static final int MAX_SPEED = 5;
+    public static final int MAX_SPEED_CAR = 4;
+    protected static final int MAX_SPEED_MOTO = 5;
+    protected static final int MAX_SPEED_VELO = 3;
+    static int MAX_SPEED = MAX_SPEED_CAR;
     private static final double STOP_DISTANCE = 50;
     private static final int LANE_WIDTH = 20;
     private long lastLaneChangeTime = 0;
@@ -28,8 +30,10 @@ public class Vehicle {
     private int laneChangesCount = 0;
 
     public Road currentRoad;
-    private int position;
+    public int position;
     boolean reachedDestination = false;
+
+
 
     private List<Road> path;
 
@@ -292,11 +296,12 @@ public class Vehicle {
         }
 
         else if(desires.contains("accelerate") && !isInRightLane) {
-            speed = MAX_SPEED + 1;
+            speed = Math.min(speed + 1, MAX_SPEED + 1);
         }
         else if(desires.contains("accelerate") && isInRightLane) {
-            speed = MAX_SPEED - 1;
+            speed = Math.min(speed + 1, MAX_SPEED - 1);
         }
+
 
         if(desires.contains("fullStop")) {
             speed = 0;

@@ -1,10 +1,15 @@
 package org.trafficSimulation.model.ai;
 
 import java.util.*;
+import org.knowm.xchart.*;
+import org.knowm.xchart.style.Styler;
 
-import org.trafficSimulation.model.traffic.Vehicle;
 
-public class TrafficLightQLearning {
+import org.trafficSimulation.model.agents.Vehicle;
+
+import javax.swing.*;
+
+public class TrafficLightQLearning{
     // Paramètres du Q-learning
     private static final double LEARNING_RATE = 0.1;
     private static final double DISCOUNT_FACTOR = 0.9;
@@ -24,6 +29,8 @@ public class TrafficLightQLearning {
         VERTICAL_GREEN, VERTICAL_ORANGE, ALL_RED, VERTICAL_RED,
         HORIZONTAL_RED
     }
+
+
 
     // Représentation de l'état du trafic
     public static class TrafficState {
@@ -99,6 +106,8 @@ public class TrafficLightQLearning {
         int horizontalDensity = calculateTrafficDensity(horizontalVehicles);
         int verticalDensity = calculateTrafficDensity(verticalVehicles);
 
+
+
         totalVehiclesHorizontal = horizontalVehicles.size();
         totalVehiclesVertical = verticalVehicles.size();
         waitingVehiclesHorizontal = countWaitingVehicles(horizontalVehicles);
@@ -116,7 +125,11 @@ public class TrafficLightQLearning {
         if (currentState != null) {
             double reward = calculateReward();
             learn(currentState, currentAction, reward, newState);
+
         }
+
+
+
 
         currentState = newState;
     }
@@ -138,25 +151,7 @@ public class TrafficLightQLearning {
         return count;
     }
 
-    // Calcule le temps d'attente total des véhicules
-    private int calculateTotalWaitTime(List<Vehicle> horizontalVehicles, List<Vehicle> verticalVehicles) {
-        int totalWaitTime = 0;
 
-        // Approximation: considérons qu'un véhicule attend s'il se déplace lentement
-        for (Vehicle v : horizontalVehicles) {
-            if (v.distanceTo(v) < 20) {
-                totalWaitTime += 1;
-            }
-        }
-
-        for (Vehicle v : verticalVehicles) {
-            if (v.distanceTo(v) < 20) {
-                totalWaitTime += 1;
-            }
-        }
-
-        return totalWaitTime;
-    }
 
     // Calcule la récompense en fonction de l'état du trafic
     private double calculateReward() {
@@ -324,11 +319,11 @@ public class TrafficLightQLearning {
     }
 
     // Exécute l'action sur les feux de circulation
-    public TrafficPhase executeAction(Action chosenAction, TrafficPhase currentPhase, int timeSinceLastChange) {
+    public TrafficPhase executeAction(TrafficPhase currentPhase, int timeSinceLastChange) {
         switch (currentPhase) {
             // Feu vert horizontal
             case HORIZONTAL_GREEN:
-                if (shouldChangeToOrange(chosenAction, timeSinceLastChange)) {
+                if (shouldChangeToOrange(timeSinceLastChange)) {
                     lastGreenPhase = TrafficPhase.HORIZONTAL_GREEN;
                     return TrafficPhase.HORIZONTAL_ORANGE;
                 }
@@ -357,7 +352,7 @@ public class TrafficLightQLearning {
 
             // Même logique pour la direction verticale
             case VERTICAL_GREEN:
-                if (shouldChangeToOrange(chosenAction, timeSinceLastChange)) {
+                if (shouldChangeToOrange(timeSinceLastChange)) {
                     lastGreenPhase = TrafficPhase.VERTICAL_GREEN;
                     return TrafficPhase.VERTICAL_ORANGE;
                 }
@@ -380,7 +375,7 @@ public class TrafficLightQLearning {
         }
     }
 
-    private boolean shouldChangeToOrange(Action chosenAction, int timeSinceLastChange) {
+    private boolean shouldChangeToOrange(int timeSinceLastChange) {
         // Changement si durée maximale atteinte OU action demandée avec durée minimale respectée
         return timeSinceLastChange >= MAX_GREEN_DURATION ||
                 ((currentAction == Action.CHANGE_TO_VERTICAL || currentAction == Action.TOGGLE_PHASE)

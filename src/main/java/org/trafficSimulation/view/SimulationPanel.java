@@ -2,17 +2,23 @@ package org.trafficSimulation.view;
 
 import javax.swing.*;
 import javax.swing.Timer;
+import javax.swing.event.ChangeListener;
 import java.awt.*;
+import java.awt.event.ActionListener;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import org.trafficSimulation.model.ai.TrafficLightQLearning;
+import org.trafficSimulation.model.argumentation.TransportArgumentation;
+import org.trafficSimulation.model.environment.Weather;
 import org.trafficSimulation.model.graph.RoadGraph;
 import org.trafficSimulation.model.road.Road;
 import org.trafficSimulation.model.road.RoadSegment;
-import org.trafficSimulation.model.traffic.TrafficLight;
-import org.trafficSimulation.model.traffic.Vehicle;
+import org.trafficSimulation.model.agents.Moto;
+import org.trafficSimulation.model.agents.TrafficLight;
+import org.trafficSimulation.model.agents.Vehicle;
+import org.trafficSimulation.model.agents.Velo;
 
 import static org.trafficSimulation.model.graph.RoadGraph.getEndPoint;
 import static org.trafficSimulation.model.graph.RoadGraph.getStartPoint;
@@ -43,87 +49,202 @@ public class SimulationPanel extends JPanel {
     private boolean simulationStarted = false;
     private JButton resetButton;
     private final List<Timer> timers = new ArrayList<>();
-
-
+    private List<Moto> motos = new ArrayList<Moto>();
+    private List<Velo> velos = new ArrayList<>();
+    private Weather weather;
+    private TransportArgumentation transportArgumentation;
+    private Random random;
+    private JComboBox<Weather.Condition> weatherConditionComboBox;
+    private JSlider temperatureSlider;
+    private JSlider windSpeedSlider;
+    private JSlider visibilitySlider;
+    private JPanel controlPanel;
 
 
 
     public SimulationPanel() {
-        setLayout(null);
-        initializeUI();
+        setLayout(new BorderLayout());
+        weather = new Weather();
+        transportArgumentation = new TransportArgumentation();
+        random = new Random();
+
+        // Créer et configurer le panneau principal de simulation
+        JPanel simulationArea = new JPanel() {
+            @Override
+            protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                SimulationPanel.this.paintComponent(g);
+            }
+        };
+        simulationArea.setPreferredSize(new Dimension(1600, 900));
+
+        // Créer le panneau de contrôle
+        createControlPanel();
+
+        // Ajouter les composants au panneau principal
+        add(simulationArea, BorderLayout.CENTER);
+        add(controlPanel, BorderLayout.EAST);
+
         initializeComponents();
+
 
     }
 
+    private void createControlPanel() {
+        controlPanel = new JPanel();
+        controlPanel.setPreferredSize(new Dimension(300, getHeight()));
+        controlPanel.setBorder(BorderFactory.createTitledBorder("Contrôles"));
+        controlPanel.setLayout(new BoxLayout(controlPanel, BoxLayout.Y_AXIS));
 
-    private void initializeUI() {
+        // Panneau pour les contrôles de simulation existants
+        JPanel simulationControls = new JPanel();
+        simulationControls.setBorder(BorderFactory.createTitledBorder("Simulation"));
+        simulationControls.setLayout(new GridLayout(0, 2, 5, 5));
 
-        // Création du checkbox pour afficher/masquer le graphe
-        showGraphCheckbox = new JCheckBox("Afficher le graphe Dijkstra");
-        showGraphCheckbox.setBounds(10, 100, 200, 20);
-        showGraphCheckbox.setOpaque(false);
+        // Ajouter les contrôles de simulation existants
+        carsPerLaneSpinner = new JSpinner(new SpinnerNumberModel(8, 1, 20, 1));
+        spawnDelaySpinner = new JSpinner(new SpinnerNumberModel(5000, 1000, 10000, 500));
+
+        simulationControls.add(new JLabel("Véhicules par voie:"));
+        simulationControls.add(carsPerLaneSpinner);
+        simulationControls.add(new JLabel("Délai d'apparition (ms):"));
+        simulationControls.add(spawnDelaySpinner);
+
+        // Panneau pour les contrôles météo
+        JPanel weatherPanel = new JPanel();
+        weatherPanel.setBorder(BorderFactory.createTitledBorder("Météo"));
+        weatherPanel.setLayout(new GridLayout(0, 2, 5, 5));
+
+        // Créer les contrôles météo
+        weatherConditionComboBox = new JComboBox<>(Weather.Condition.values());
+        temperatureSlider = new JSlider(JSlider.HORIZONTAL, -10, 40, 20);
+        windSpeedSlider = new JSlider(JSlider.HORIZONTAL, 0, 100, 0);
+        visibilitySlider = new JSlider(JSlider.HORIZONTAL, 0, 1000, 1000);
+
+        // Configurer les sliders
+        configureSlider(temperatureSlider, "°C", 10, 5);
+        configureSlider(windSpeedSlider, "", 20, 5);
+        configureSlider(visibilitySlider, "m", 200, 50);
+
+        // Ajouter les contrôles météo
+        weatherPanel.add(new JLabel("Condition:"));
+        weatherPanel.add(weatherConditionComboBox);
+        weatherPanel.add(new JLabel("Température:"));
+        weatherPanel.add(temperatureSlider);
+        weatherPanel.add(new JLabel("Vitesse du vent:"));
+        weatherPanel.add(windSpeedSlider);
+        weatherPanel.add(new JLabel("Visibilité:"));
+        weatherPanel.add(visibilitySlider);
+
+        // Panneau pour les boutons
+        JPanel buttonPanel = new JPanel();
+        buttonPanel.setLayout(new FlowLayout());
+
+        startButton = new JButton("Démarrer");
+        resetButton = new JButton("Réinitialiser");
+        showGraphCheckbox = new JCheckBox("Afficher le graphe");
+        showDestinationsCheckbox = new JCheckBox("Afficher les destinations");
+
+
+
+
+        buttonPanel.add(startButton);
+        buttonPanel.add(resetButton);
+        buttonPanel.add(showGraphCheckbox);
+        buttonPanel.add(showDestinationsCheckbox);
+
+
+        // Ajouter les listeners
+        addControlListeners();
+
+        // Ajouter tous les panneaux au panneau de contrôle
+        controlPanel.add(simulationControls);
+        controlPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        controlPanel.add(weatherPanel);
+        controlPanel.add(Box.createRigidArea(new Dimension(0, 10)));
+        controlPanel.add(buttonPanel);
+    }
+
+
+
+
+
+
+    private void configureSlider(JSlider slider, String unit, int majorTick, int minorTick) {
+        slider.setPaintTicks(true);
+        slider.setPaintLabels(true);
+        slider.setMajorTickSpacing(majorTick);
+        slider.setMinorTickSpacing(minorTick);
+        slider.setPreferredSize(new Dimension(600, 50));  // Augmenté à 400 pixels de large
+
+        Hashtable<Integer, JLabel> labelTable = new Hashtable<>();
+
+        // Valeur minimale
+        JLabel minLabel = new JLabel(slider.getMinimum() + unit);
+        minLabel.setFont(new Font("Sans-Serif", Font.PLAIN, 12));
+        minLabel.setBorder(BorderFactory.createEmptyBorder(0, 15, 0, 0));  // Marges augmentées
+        labelTable.put(slider.getMinimum(), minLabel);
+
+        // Valeur médiane
+        int median = (slider.getMaximum() + slider.getMinimum()) / 2;
+        JLabel medLabel = new JLabel(median + unit);
+        medLabel.setFont(new Font("Sans-Serif", Font.PLAIN, 12));
+        medLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));  // Marges augmentées
+        labelTable.put(median, medLabel);
+
+        // Valeur maximale
+        JLabel maxLabel = new JLabel(slider.getMaximum() + unit);
+        maxLabel.setFont(new Font("Sans-Serif", Font.PLAIN, 12));
+        maxLabel.setBorder(BorderFactory.createEmptyBorder(0, 0, 0, 0));  // Marges augmentées
+        labelTable.put(slider.getMaximum(), maxLabel);
+
+        slider.setLabelTable(labelTable);
+
+
+    }
+
+    private void addControlListeners() {
+        startButton.addActionListener(e -> {
+            if (!simulationStarted) {
+                startSimulation();
+                startButton.setText("Démarrer");
+            }
+            simulationStarted = !simulationStarted;
+        });
+
+        resetButton.addActionListener(e -> resetSimulation());
+
         showGraphCheckbox.addActionListener(e -> {
             showGraph = showGraphCheckbox.isSelected();
             repaint();
         });
-        add(showGraphCheckbox);
 
-        showDestinationsCheckbox = new JCheckBox("Afficher les destinations");
-        showDestinationsCheckbox.setBounds(10, 130, 200, 20);
-        showDestinationsCheckbox.setOpaque(false);
         showDestinationsCheckbox.addActionListener(e -> {
             showDestinations = showDestinationsCheckbox.isSelected();
             repaint();
         });
-        add(showDestinationsCheckbox);
 
+        // Listener pour les changements météo
+        ActionListener weatherUpdateListener = e -> updateWeatherConditions();
+        ChangeListener sliderListener = e -> updateWeatherConditions();
 
-        JLabel carsLabel = new JLabel("Voitures par voie:");
-        carsLabel.setBounds(10, 160, 120, 20);
-        add(carsLabel);
-
-        SpinnerNumberModel carsModel = new SpinnerNumberModel(carsPerLane, 1, 20, 1);
-        carsPerLaneSpinner = new JSpinner(carsModel);
-        carsPerLaneSpinner.setBounds(130, 160, 60, 20);
-        carsPerLaneSpinner.addChangeListener(e -> {
-            carsPerLane = (int) carsPerLaneSpinner.getValue();
-        });
-        add(carsPerLaneSpinner);
-
-        // Contrôles pour spawnDelay
-        JLabel delayLabel = new JLabel("Délai d'apparition (ms):");
-        delayLabel.setBounds(10, 190, 120, 20);
-        add(delayLabel);
-
-        SpinnerNumberModel delayModel = new SpinnerNumberModel(spawnDelay, 1000, 10000, 500);
-        spawnDelaySpinner = new JSpinner(delayModel);
-        spawnDelaySpinner.setBounds(130, 190, 80, 20);
-        spawnDelaySpinner.addChangeListener(e -> {
-            spawnDelay = (int) spawnDelaySpinner.getValue();
-        });
-        add(spawnDelaySpinner);
-
-        startButton = new JButton("Démarrer la simulation");
-        startButton.setBounds(10, 220, 200, 30);
-        startButton.addActionListener(e -> {
-            if (!simulationStarted) {
-                startSimulation();
-                startButton.setEnabled(false);
-                carsPerLaneSpinner.setEnabled(false);
-                spawnDelaySpinner.setEnabled(false);
-                simulationStarted = true;
-            }
-        });
-        add(startButton);
-
-        resetButton = new JButton("Réinitialiser");
-        resetButton.setBounds(10, 260, 200, 30);
-        resetButton.addActionListener(e -> resetSimulation());
-        add(resetButton);
-
-
-
+        weatherConditionComboBox.addActionListener(weatherUpdateListener);
+        temperatureSlider.addChangeListener(sliderListener);
+        windSpeedSlider.addChangeListener(sliderListener);
+        visibilitySlider.addChangeListener(sliderListener);
     }
+
+
+
+    private void updateWeatherConditions() {
+        Weather.Condition condition = (Weather.Condition) weatherConditionComboBox.getSelectedItem();
+        double temperature = temperatureSlider.getValue();
+        double windSpeed = windSpeedSlider.getValue();
+        double visibility = visibilitySlider.getValue();
+
+        weather.updateWeather(condition, temperature, windSpeed, visibility);
+    }
+
 
 
     private void resetSimulation() {
@@ -135,6 +256,8 @@ public class SimulationPanel extends JPanel {
 
         // Réinitialiser les variables
         vehicles.clear();
+        motos.clear();
+        velos.clear();
         travelTimes.clear();
         laneChanges.clear();
         simulationStarted = false;
@@ -170,6 +293,7 @@ public class SimulationPanel extends JPanel {
         mainRoads.forEach(road -> {
             // Créer le premier véhicule immédiatement
             createAndAddVehicle(road);
+
 
             // Programmer la création des véhicules suivants avec le délai spécifié
             for (int i = 1; i < carsPerLane; i++) {
@@ -543,7 +667,6 @@ public class SimulationPanel extends JPanel {
     public Vehicle createAndAddVehicle(Road road) {
         Road destination = selectRandomDestination(road);
 
-
         if (destination == null) {
             System.out.println("Aucune destination valide trouvée pour la route: " + road);
             return null;
@@ -552,15 +675,40 @@ public class SimulationPanel extends JPanel {
         Point start = getStartPoint(road);
         Point end = getEndPoint(destination);
         List<Road> path = roadGraph.findShortestPath(start, end);
+        int distance = calculatePathDistance(path);
 
-        if (!path.isEmpty()) {
-            Vehicle v = new Vehicle(road, 0, 2, this, destination);
-            v.setPath(path);
-            vehicles.add(v);
+
+        boolean bonneSante = random.nextBoolean();
+
+        // Utiliser l'argumentation pour choisir le type de véhicule
+        String typeTransport = transportArgumentation.chooseTransport(distance, bonneSante, weather);
+
+        Vehicle vehicle;
+        switch (typeTransport) {
+            case "velo":
+                vehicle = new Velo(road, 0, Velo.VELO_BASE_SPEED, this, destination);
+                break;
+            case "moto":
+                vehicle = new Moto(road, 0, Moto.MOTO_BASE_SPEED, this, destination);
+                break;
+            default:
+                vehicle = new Vehicle(road, 0, Vehicle.MAX_SPEED_CAR, this, destination);
         }
-        return null;
+
+        vehicle.setPath(path);
+        vehicles.add(vehicle);
+        return vehicle;
 
     }
+
+    private int calculatePathDistance(List<Road> path) {
+        int distance = 0;
+        for (Road road : path) {
+            distance += road.getLength();
+        }
+        return distance / 100; // Conversion en kilomètres approximatifs
+    }
+
 
 
 
@@ -571,30 +719,71 @@ public class SimulationPanel extends JPanel {
     public void updateSimulation() {
         manageTrafficLights();
         vehicles.forEach(Vehicle::update);
+        motos.forEach(Moto::update);
+        velos.forEach(Velo::update);
 
+        // Gestion des véhicules arrivés
         List<Vehicle> arrived = vehicles.stream()
                 .filter(Vehicle::hasReachedDestination)
                 .collect(Collectors.toList());
 
+        List<Moto> arrivedMotos = motos.stream()
+                .filter(Moto::hasReachedDestination)
+                .collect(Collectors.toList());
 
-        vehicles.removeAll(arrived);
+        List<Velo> arrivedVelos = velos.stream()
+                .filter(Velo::hasReachedDestination)
+                .collect(Collectors.toList());
 
+        // Mise à jour des statistiques
         arrived.forEach(v -> {
-                    travelTimes.put(v, v.getTravelTime() );
-                    laneChanges.put(v, v.getLaneChangesCount());
-                }
-        );
+            travelTimes.put(v, v.getTravelTime());
+            laneChanges.put(v, v.getLaneChangesCount());
+        });
 
+        arrivedMotos.forEach(m -> {
+            travelTimes.put(m, m.getTravelTime());
+            laneChanges.put(m, m.getLaneChangesCount());
+        });
+
+        arrivedVelos.forEach(v -> {
+            travelTimes.put(v, v.getTravelTime());
+            laneChanges.put(v, v.getLaneChangesCount());
+        });
+
+        // Suppression des véhicules arrivés
         vehicles.removeAll(arrived);
+        motos.removeAll(arrivedMotos);
+        velos.removeAll(arrivedVelos);
+
+
 
     }
 
     public List<Vehicle> getVehiclesOnRoad(Road road) {
-        return Collections.unmodifiableList(
+        List<Vehicle> allVehicles = new ArrayList<>();
+
+        allVehicles.addAll(
                 vehicles.stream()
                         .filter(v -> v.currentRoad.equals(road))
                         .collect(Collectors.toList())
         );
+
+        allVehicles.addAll(
+                motos.stream()
+                        .filter(m -> m.currentRoad.equals(road))
+                        .collect(Collectors.toList())
+        );
+
+        allVehicles.addAll(
+                velos.stream()
+                        .filter(v -> v.currentRoad.equals(road))
+                        .collect(Collectors.toList())
+        );
+
+        return Collections.unmodifiableList(allVehicles);
+
+
     }
 
     private void manageTrafficLights() {
@@ -617,7 +806,7 @@ public class SimulationPanel extends JPanel {
         TrafficLightQLearning.Action action = qLearning.chooseAction();
 
         // Exécuter l'action
-        TrafficLightQLearning.TrafficPhase newPhase = qLearning.executeAction(action,currentTrafficPhase, timeSinceLastChange);
+        TrafficLightQLearning.TrafficPhase newPhase = qLearning.executeAction(currentTrafficPhase, timeSinceLastChange);
 
         // Si la phase a changé
         if (newPhase != currentTrafficPhase) {
@@ -658,9 +847,6 @@ public class SimulationPanel extends JPanel {
                 .forEach(light -> light.setState(state));
     }
 
-    private void setAllLights(TrafficLight.State state) {
-        trafficLights.forEach(light -> light.setState(state));
-    }
 
 
     @Override
@@ -669,10 +855,20 @@ public class SimulationPanel extends JPanel {
         setBackground(Color.WHITE);
         Graphics2D g2d = (Graphics2D) g;
 
+        g2d.setColor(Color.BLACK);
+        g2d.drawString("Météo: " + weather.getCurrentCondition(), 10, getHeight() - 60);
+        g2d.drawString("Température: " + weather.getTemperature() + "°C", 10, getHeight() - 45);
+        g2d.drawString("Vent: " + weather.getWindSpeed() + " km/h", 10, getHeight() - 30);
+        g2d.drawString("Visibilité: " + weather.getVisibility() + " m", 10, getHeight() - 15);
+
+
         roads.forEach(r -> r.draw(g));
         g.setColor(Color.BLACK);
         trafficLights.forEach(t -> t.draw(g));
         vehicles.forEach(v -> v.draw(g));
+        motos.forEach(m -> m.draw(g));
+        velos.forEach(v -> v.draw(g));
+
         g.setColor(Color.RED);
         AtomicInteger yPos = new AtomicInteger(30);
         g.drawString("Métriques Globales :", 10, yPos.get());
@@ -696,12 +892,8 @@ public class SimulationPanel extends JPanel {
 
         if (showDestinations) {
             drawDestinations(g);
-        }
-
-        if (showDestinations) {
             drawValidatedPaths(g);
         }
-
 
 
     }
@@ -715,42 +907,60 @@ public class SimulationPanel extends JPanel {
         Stroke originalStroke = g2d.getStroke();
         g2d.setStroke(new BasicStroke(2.0f));
 
-        // Pour chaque véhicule, dessiner une ligne vers sa destination
+        // Dessiner les destinations pour les véhicules
         for (Vehicle vehicle : vehicles) {
-            Road destinationRoad = vehicle.getDestination();
-            if (destinationRoad != null) {
-                Point vehiclePos = vehicle.getPosition();
-                Point destinationPoint = getEndPoint(destinationRoad);
+            drawVehicleDestination(g2d, vehicle);
+        }
 
-                if (vehiclePos != null && destinationPoint != null) {
-                    // Dessiner une ligne semi-transparente avec une couleur unique pour chaque véhicule
-                    Color vehicleColor = vehicle.getColor();
-                    g2d.setColor(new Color(vehicleColor.getRed(), vehicleColor.getGreen(),
-                            vehicleColor.getBlue(), 100)); // Alpha transparency
+        // Dessiner les destinations pour les motos
+        for (Moto moto : motos) {
+            drawVehicleDestination(g2d, moto);
+        }
 
-                    // Dessiner la ligne de la position actuelle vers la destination
-                    g2d.drawLine(vehiclePos.x, vehiclePos.y, destinationPoint.x, destinationPoint.y);
+        for (Velo velo : velos) {
+            drawVehicleDestination(g2d, velo);
+        }
 
-                    // Dessiner un cercle à la destination
-                    int destinationSize = 12;
-                    g2d.setColor(new Color(vehicleColor.getRed(), vehicleColor.getGreen(),
-                            vehicleColor.getBlue(), 180)); // More opaque
-                    g2d.fillOval(destinationPoint.x - destinationSize/2,
-                            destinationPoint.y - destinationSize/2,
-                            destinationSize, destinationSize);
-                }
-            }
-
-            g.setColor(new Color(0, 255, 0, 100));
-            for (Road dest : endpointRoads) {
-                Point p = getEndPoint(dest);
-                g.fillOval(p.x-8, p.y-8, 16, 16);
-            }
+        // Dessiner les points de destination possibles
+        g.setColor(new Color(0, 255, 0, 100));
+        for (Road dest : endpointRoads) {
+            Point p = getEndPoint(dest);
+            g.fillOval(p.x-8, p.y-8, 16, 16);
         }
 
         // Restaurer le style original
         g2d.setStroke(originalStroke);
     }
+
+    private void drawVehicleDestination(Graphics2D g2d, Vehicle vehicle) {
+        Road destinationRoad = vehicle.getDestination();
+        if (destinationRoad != null) {
+            Point vehiclePos = vehicle.getPosition();
+            Point destinationPoint = getEndPoint(destinationRoad);
+
+            if (vehiclePos != null && destinationPoint != null) {
+                // Utiliser une couleur différente pour les motos
+                Color vehicleColor = vehicle instanceof Moto ?
+                        new Color(100, 100, 100) : // Gris pour les motos
+                        vehicle.getColor();
+
+                // Dessiner la ligne vers la destination
+                g2d.setColor(new Color(vehicleColor.getRed(), vehicleColor.getGreen(),
+                        vehicleColor.getBlue(), 100)); // Semi-transparent
+                g2d.drawLine(vehiclePos.x, vehiclePos.y, destinationPoint.x, destinationPoint.y);
+
+                // Dessiner le marqueur de destination
+                int destinationSize = vehicle instanceof Moto ? 8 : 12; // Plus petit pour les motos
+                g2d.setColor(new Color(vehicleColor.getRed(), vehicleColor.getGreen(),
+                        vehicleColor.getBlue(), 180)); // Plus opaque
+                g2d.fillOval(destinationPoint.x - destinationSize/2,
+                        destinationPoint.y - destinationSize/2,
+                        destinationSize, destinationSize);
+            }
+        }
+    }
+
+
 
     public Map<Road, Map<Road, List<Road>>> validateAllPaths() {
         Map<Road, Map<Road, List<Road>>> validPathsMap = new HashMap<>();
@@ -903,11 +1113,36 @@ public class SimulationPanel extends JPanel {
 
 
     public List<Vehicle> getVehiclesInLane(Vehicle requester) {
-        return vehicles.stream()
-                .filter(v -> v != requester)
-                .filter(v -> v.currentRoad == requester.currentRoad)
-                .filter(v -> Math.abs(v.laneOffset - requester.laneOffset) < 15)
-                .collect(Collectors.toList());
+        List<Vehicle> allVehiclesInLane = new ArrayList<>();
+
+        // Ajouter les véhicules dans la même voie
+        allVehiclesInLane.addAll(
+                vehicles.stream()
+                        .filter(v -> v != requester)
+                        .filter(v -> v.currentRoad == requester.currentRoad)
+                        .filter(v -> Math.abs(v.laneOffset - requester.laneOffset) < 15)
+                        .collect(Collectors.toList())
+        );
+
+        // Ajouter les motos dans la même voie
+        allVehiclesInLane.addAll(
+                motos.stream()
+                        .filter(m -> m != requester)
+                        .filter(m -> m.currentRoad == requester.currentRoad)
+                        .filter(m -> Math.abs(m.laneOffset - requester.laneOffset) < 15)
+                        .collect(Collectors.toList())
+        );
+
+        allVehiclesInLane.addAll(
+                velos.stream()
+                        .filter(m -> m != requester)
+                        .filter(m -> m.currentRoad == requester.currentRoad)
+                        .filter(m -> Math.abs(m.laneOffset - requester.laneOffset) < 15)
+                        .collect(Collectors.toList())
+        );
+
+        return allVehiclesInLane;
+
     }
 
 
