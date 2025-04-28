@@ -1,9 +1,6 @@
 package org.trafficSimulation.model.ai;
 
 import java.util.*;
-import org.knowm.xchart.*;
-import org.knowm.xchart.style.Styler;
-
 
 import org.trafficSimulation.model.agents.Vehicle;
 
