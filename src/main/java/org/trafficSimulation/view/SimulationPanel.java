@@ -1044,16 +1044,9 @@ public class SimulationPanel extends JPanel {
 
         g2d.setStroke(originalStroke);
 
-        // Légende
-        drawPathsLegend(g2d, allPaths.size());
     }
 
-    private void drawPathsLegend(Graphics2D g2d, int totalPaths) {
-        g2d.setColor(Color.BLACK);
-        g2d.drawString("Chemins valides: " + totalPaths, 10, getHeight() - 30);
-        g2d.drawString("○ Point de départ", 10, getHeight() - 50);
-        g2d.drawString("● Destination", 10, getHeight() - 70);
-    }
+
 
 
     private void drawDijkstraGraph(Graphics g) {
