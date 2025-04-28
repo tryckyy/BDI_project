@@ -1,6 +1,5 @@
 package org.trafficSimulation.view;
 
-import javax.sound.midi.SysexMessage;
 import javax.swing.*;
 import javax.swing.Timer;
 import java.awt.*;
@@ -36,12 +35,26 @@ public class SimulationPanel extends JPanel {
     private JCheckBox showGraphCheckbox;
     private boolean showDestinations = false;
     private JCheckBox showDestinationsCheckbox;
+    private int carsPerLane = 8;
+    private int spawnDelay = 5000;
+    private JSpinner carsPerLaneSpinner;
+    private JSpinner spawnDelaySpinner;
+    private JButton startButton;
+    private boolean simulationStarted = false;
+    private JButton resetButton;
+    private final List<Timer> timers = new ArrayList<>();
+
+
+
+
 
     public SimulationPanel() {
         setLayout(null);
-        initializeComponents();
         initializeUI();
+        initializeComponents();
+
     }
+
 
     private void initializeUI() {
 
@@ -65,9 +78,110 @@ public class SimulationPanel extends JPanel {
         add(showDestinationsCheckbox);
 
 
+        JLabel carsLabel = new JLabel("Voitures par voie:");
+        carsLabel.setBounds(10, 160, 120, 20);
+        add(carsLabel);
+
+        SpinnerNumberModel carsModel = new SpinnerNumberModel(carsPerLane, 1, 20, 1);
+        carsPerLaneSpinner = new JSpinner(carsModel);
+        carsPerLaneSpinner.setBounds(130, 160, 60, 20);
+        carsPerLaneSpinner.addChangeListener(e -> {
+            carsPerLane = (int) carsPerLaneSpinner.getValue();
+        });
+        add(carsPerLaneSpinner);
+
+        // Contrôles pour spawnDelay
+        JLabel delayLabel = new JLabel("Délai d'apparition (ms):");
+        delayLabel.setBounds(10, 190, 120, 20);
+        add(delayLabel);
+
+        SpinnerNumberModel delayModel = new SpinnerNumberModel(spawnDelay, 1000, 10000, 500);
+        spawnDelaySpinner = new JSpinner(delayModel);
+        spawnDelaySpinner.setBounds(130, 190, 80, 20);
+        spawnDelaySpinner.addChangeListener(e -> {
+            spawnDelay = (int) spawnDelaySpinner.getValue();
+        });
+        add(spawnDelaySpinner);
+
+        startButton = new JButton("Démarrer la simulation");
+        startButton.setBounds(10, 220, 200, 30);
+        startButton.addActionListener(e -> {
+            if (!simulationStarted) {
+                startSimulation();
+                startButton.setEnabled(false);
+                carsPerLaneSpinner.setEnabled(false);
+                spawnDelaySpinner.setEnabled(false);
+                simulationStarted = true;
+            }
+        });
+        add(startButton);
+
+        resetButton = new JButton("Réinitialiser");
+        resetButton.setBounds(10, 260, 200, 30);
+        resetButton.addActionListener(e -> resetSimulation());
+        add(resetButton);
+
 
 
     }
+
+
+    private void resetSimulation() {
+        // Arrêter tous les timers actifs
+        for (Timer timer : timers) {
+            timer.stop();
+        }
+        timers.clear();
+
+        // Réinitialiser les variables
+        vehicles.clear();
+        travelTimes.clear();
+        laneChanges.clear();
+        simulationStarted = false;
+        timeSinceLastChange = 0;
+        currentTrafficPhase = TrafficLightQLearning.TrafficPhase.HORIZONTAL_GREEN;
+
+        // Réinitialiser les feux de circulation
+        setHorizontalLights(TrafficLight.State.GREEN);
+        setVerticalLights(TrafficLight.State.RED);
+
+        // Réactiver les contrôles
+        startButton.setEnabled(true);
+        carsPerLaneSpinner.setEnabled(true);
+        spawnDelaySpinner.setEnabled(true);
+
+        // Rafraîchir l'affichage
+        repaint();
+    }
+
+    private void startSimulation() {
+        carsPerLane = (int) carsPerLaneSpinner.getValue();
+        spawnDelay = (int) spawnDelaySpinner.getValue();
+
+        // Liste des routes principales
+        List<Road> mainRoads = List.of(
+                roads.get(0),  // horizontalRoadRight
+                roads.get(1),  // horizontalRoadLeft
+                roads.get(2),  // verticalRoadRight
+                roads.get(3)   // verticalRoadLeft
+        );
+
+        // Créer et ajouter les véhicules pour chaque route principale
+        mainRoads.forEach(road -> {
+            // Créer le premier véhicule immédiatement
+            createAndAddVehicle(road);
+
+            // Programmer la création des véhicules suivants avec le délai spécifié
+            for (int i = 1; i < carsPerLane; i++) {
+                Timer timer = new Timer(i * spawnDelay, e -> createAndAddVehicle(road));
+                timer.setRepeats(false);
+                timers.add(timer); // Garder une référence au timer
+                timer.start();
+            }
+        });
+
+    }
+
 
 
     private void generateDijkstraGraph() {
@@ -145,6 +259,8 @@ public class SimulationPanel extends JPanel {
             }
         }
 
+
+
         // Log pour vérification
         int totalConnections = 0;
         for (Set<Point> connections : graphEdges.values()) {
@@ -180,6 +296,8 @@ public class SimulationPanel extends JPanel {
             }
         }
     }
+
+
 
 
     private void initializeComponents() {
@@ -286,33 +404,12 @@ public class SimulationPanel extends JPanel {
         ));
 
 
-
-
-        List<Road> mainRoads = List.of(
-                horizontalRoadLeft,
-                horizontalRoadRight,
-                verticalRoadRight,
-                verticalRoadLeft
-        );
-
         connectRoads();
         identifyTrueEndpoints();
         generateDijkstraGraph();
 
 
 
-        int carsPerLane = 8;
-        int spawnDelay = 5000;
-
-        mainRoads.forEach(road -> {
-            createAndAddVehicle(road);
-
-            for (int i = 1; i < carsPerLane; i++) {
-                Timer timer = new Timer(i * spawnDelay, e -> createAndAddVehicle(road));
-                timer.setRepeats(false);
-                timer.start();
-            }
-        });
 
         int offset = 50;
 
@@ -401,6 +498,7 @@ public class SimulationPanel extends JPanel {
 
 
 
+
     /**
      * Identifie les routes qui sont des points d'entrée et de sortie
      */
@@ -442,13 +540,13 @@ public class SimulationPanel extends JPanel {
     }
 
 
-    public void createAndAddVehicle(Road road) {
+    public Vehicle createAndAddVehicle(Road road) {
         Road destination = selectRandomDestination(road);
 
 
         if (destination == null) {
             System.out.println("Aucune destination valide trouvée pour la route: " + road);
-            return;
+            return null;
         }
 
         Point start = getStartPoint(road);
@@ -459,8 +557,9 @@ public class SimulationPanel extends JPanel {
             Vehicle v = new Vehicle(road, 0, 2, this, destination);
             v.setPath(path);
             vehicles.add(v);
-
         }
+        return null;
+
     }
 
 
@@ -571,6 +670,7 @@ public class SimulationPanel extends JPanel {
         Graphics2D g2d = (Graphics2D) g;
 
         roads.forEach(r -> r.draw(g));
+        g.setColor(Color.BLACK);
         trafficLights.forEach(t -> t.draw(g));
         vehicles.forEach(v -> v.draw(g));
         g.setColor(Color.RED);

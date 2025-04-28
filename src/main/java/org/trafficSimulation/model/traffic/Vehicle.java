@@ -20,28 +20,28 @@ public class Vehicle {
     private static final long LANE_CHANGE_COOLDOWN = 1000;
 
     private final Road destination;
-    private final int baseSpeed = 2;
+    int baseSpeed = 2;
 
     private Color color;
-    private final SimulationPanel environment;
+    final SimulationPanel environment;
     private final long creationTime = System.currentTimeMillis(); // Temps de création
     private int laneChangesCount = 0;
 
     public Road currentRoad;
     private int position;
-    private boolean reachedDestination = false;
+    boolean reachedDestination = false;
 
     private List<Road> path;
 
-    private int speed;
-    private boolean isInRightLane;
+    int speed;
+    boolean isInRightLane;
     public int laneOffset;
 
 
 
     // Système BDI
-    private final Map<String, Object> beliefs = new HashMap<>();
-    private final List<String> desires = new ArrayList<>();
+    final Map<String, Object> beliefs = new HashMap<>();
+    final List<String> desires = new ArrayList<>();
 
     public Vehicle(Road road, int initialPos, int speed, SimulationPanel environment, Road destination) {
         this.currentRoad = road;
@@ -72,7 +72,7 @@ public class Vehicle {
         return reachedDestination;
     }
 
-    private void checkDestination() {
+    void checkDestination() {
         // ONLY check if on the final destination road and at its end point
         if (currentRoad.equals(destination)) {
             boolean atEndOfRoad = currentRoad.isReverse()
@@ -94,7 +94,7 @@ public class Vehicle {
         checkDestination();
     }
 
-    private void perceiveEnvironment() {
+    void perceiveEnvironment() {
         beliefs.put("nextTrafficLight", environment.getNextTrafficLight(this));
         beliefs.put("frontVehicle", environment.getVehiclesInLane(this).stream()
                 .filter(this::isAheadOf)
@@ -137,7 +137,7 @@ public class Vehicle {
 
 
 
-    private void evaluateDesires() {
+    void evaluateDesires() {
         desires.clear();
 
         if(!beliefs.containsKey("changeLane")) {
@@ -277,7 +277,7 @@ public class Vehicle {
         return destination;
     }
 
-    private void executeIntention() {
+    void executeIntention() {
         if (desires.contains("changeLane")) {
             changeLane();
             desires.add("accelerate");
@@ -304,7 +304,7 @@ public class Vehicle {
     }
 
 
-    private void move() {
+    void move() {
         if (reachedDestination) return;
 
         position += currentRoad.isReverse() ? -speed : speed;
@@ -333,7 +333,7 @@ public class Vehicle {
 
 
 
-    private boolean isAheadOf(Vehicle other) {
+    boolean isAheadOf(Vehicle other) {
         if(currentRoad.isHorizontal()) {
             return this.getFrontPosition().x < other.getFrontPosition().x;
         } else {
@@ -404,5 +404,8 @@ public class Vehicle {
             }
         }
 
+    }
+
+    protected void setColor(Color color) {
     }
 }
