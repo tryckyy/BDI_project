@@ -41,7 +41,7 @@ public class SimulationPanel extends JPanel {
     private JCheckBox showGraphCheckbox;
     private boolean showDestinations = false;
     private JCheckBox showDestinationsCheckbox;
-    private int carsPerLane = 8;
+    private int carsPerLane = 1;
     private int spawnDelay = 5000;
     private JSpinner carsPerLaneSpinner;
     private JSpinner spawnDelaySpinner;
@@ -102,7 +102,7 @@ public class SimulationPanel extends JPanel {
         simulationControls.setLayout(new GridLayout(0, 2, 5, 5));
 
         // Ajouter les contrôles de simulation existants
-        carsPerLaneSpinner = new JSpinner(new SpinnerNumberModel(8, 1, 20, 1));
+        carsPerLaneSpinner = new JSpinner(new SpinnerNumberModel(1, 1, 20, 1));
         spawnDelaySpinner = new JSpinner(new SpinnerNumberModel(5000, 1000, 10000, 500));
 
         simulationControls.add(new JLabel("Véhicules par voie:"));
